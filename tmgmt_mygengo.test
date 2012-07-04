@@ -93,8 +93,9 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $post = array(
       'job' => json_encode(array(
         'custom_data' => $data->jobs->$key->custom_data,
-        'body_src' => $data->jobs->$key->lc_tgt . '_' . $data->jobs->$key->body_src,
+        'body_src' => $data->jobs->$key->body_src,
         'body_tgt' => $data->jobs->$key->lc_tgt . '_' . $data->jobs->$key->body_src,
+        'status' => 'approved',
       )),
     );
     $action = $data->jobs->$key->callback_url;

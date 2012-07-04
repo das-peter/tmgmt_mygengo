@@ -144,7 +144,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         'lc_tgt' => $job->target_language,
         'tier' => $tier,
         'callback_url' => url('tmgmt_mygengo_callback', array('absolute' => TRUE)),
-        'custom_data' => $job->tjid . '][' . $key
+        'custom_data' => $job->tjid . '][' . $key,
+        'auto_approve' => $job->getSetting('mygengo_auto_approve'),
       );
     }
     return $translations;
@@ -154,14 +155,9 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Receives and stores a translation returned by myGengo.
    */
   public function receiveTranslation(TMGMTJob $job, $keys, $data) {
-    // @todo Clean this up once sandbox and production return the same thing.
-    if ($job->getTranslator()->getSetting('use_sandbox')) {
-      $translation = $data->body_src;
+    if ($data->status == 'approved') {
+      $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
     }
-    else {
-      $translation = $data->body_tgt;
-    }
-    $job->addTranslatedData(array('#text' => $data->body_src), $keys);
   }
 
   /**
