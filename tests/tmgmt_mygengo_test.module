@@ -51,20 +51,38 @@ function tmgmt_mygengo_test_service_get_languages() {
  * Page callback for getting the supported languages.
  */
 function tmgmt_mygengo_test_service_translate() {
-
   $opstat = 'failure';
 
   if ($_POST['api_key'] == 'correct key') {
     $sig = hash_hmac('sha1', $_POST['ts'], 'correct key');
     if ($sig == $_POST['api_sig']) {
       $opstat = 'ok';
-      variable_set('tmgmt_mygengo_test_data', json_decode($_POST['data']));
+      $data = json_decode($_POST['data']);
+      variable_set('tmgmt_mygengo_test_data', $data);
     }
   }
 
   drupal_json_output(array(
     'opstat' => $opstat,
-    'response' => 'TBD',
+    'response' => $opstat == 'ok' ? tmgmt_mygengo_test_service_translate_response($data) : '',
   ));
 }
 
+/**
+ * Convert submitted job data into a response.
+ */
+function tmgmt_mygengo_test_service_translate_response($data) {
+  $jobs = $data->jobs;
+  $data->jobs = array();
+  foreach ($jobs as $jobid => $job) {
+    $job->body_tgt = 'mt_' . $job->lc_tgt . '_' . $job->body_src;
+    $job->mt = 1;
+    $job->unit_count = str_word_count($job->body_src);
+    $job->credits = 0;
+    $job->status = 'available';
+    $job->eta = -1;
+    $job->ctime = date('Y-m-d H:i:s');
+    $data->jobs[][$jobid] = $job;
+  }
+  return $data;
+}

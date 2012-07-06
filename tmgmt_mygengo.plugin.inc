@@ -109,6 +109,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       ));
 
     if (!empty($response)) {
+      foreach ($response->jobs as $response_job) {
+        // The response is an array of objects, each job is wrapped in another
+        // object.
+        $response_job = reset($response_job);
+        // If tier is "machine", API returns translation immediately.
+        if ($response_job->tier == 'machine') {
+          $key = array_slice(tmgmt_ensure_keys_array($response_job->custom_data), 1);
+          $job->addTranslatedData(array('#text' => $response_job->body_tgt), $key);
+        }
+      }
       $job->submitted('Job has been submitted.');
     }
     else {

@@ -40,6 +40,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $translator->save();
 
     $job = $this->createJob();
+    $job->settings['quality'] = 'standard';
     $job->translator = $translator->name;
     $item = $job->addItem('test_source', 'test', '1');
     $item->data = array(
@@ -83,7 +84,11 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertTrue($job->isTranslatable());
 
     $job->requestTranslation();
+    // Check that job is active.
     $this->assertTrue($job->isActive());
+    foreach ($job->getItems() as $item) {
+      $this->assertTrue($item->isActive());
+    }
 
     // "Translate" data.
     $this->refreshVariables();
@@ -116,6 +121,32 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $item = end($items);
     $data = $item->getData();
     $this->assertEqual('de_Hello world', $data['wrapper']['#translation']['#text']);
+
+    // Test machine translation.
+    $job = $this->createJob();
+    $job->settings['quality'] = 'machine';
+    $job->translator = $translator->name;
+    $item = $job->addItem('test_source', 'test', '1');
+    $item->data = array(
+      'wrapper' => array(
+        '#text' => 'Hello world',
+      ),
+      'wrapper2' => array(
+        '#text' => 'Hello world again',
+      ),
+    );
+    $item->save();
+
+    // Machine translation should immediately go to needs review.
+    $job->requestTranslation();
+    foreach ($job->getItems() as $item) {
+      $this->assertTrue($item->isNeedsReview());
+    }
+    $items = $job->getItems();
+    $item = end($items);
+    $data = $item->getData();
+    $this->assertEqual('mt_de_Hello world', $data['wrapper']['#translation']['#text']);
+    $this->assertEqual('mt_de_Hello world again', $data['wrapper2']['#translation']['#text']);
   }
 
 }
