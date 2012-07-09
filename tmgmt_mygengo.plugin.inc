@@ -148,7 +148,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       // - Ryan McGrath, who dislikes this error intensely
       $translations['job' . $job->tjid . $key] = array(
         'type' => 'text',
-        'slug' => $key,
+        'slug' => tmgmt_data_item_label($value),
         'body_src' => $value['#text'],
         'lc_src' => $job->source_language,
         'lc_tgt' => $job->target_language,

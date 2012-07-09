@@ -46,6 +46,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $item->data = array(
       'wrapper' => array(
         '#text' => 'Hello world',
+        '#label' => 'Wrapper label',
       ),
     );
     $item->save();
@@ -110,6 +111,9 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertResponse(200);
     $this->assertTrue(empty($out));
 
+    // Verify the label/slug.
+    $this->assertEqual($data->jobs->$key->slug, $item->data['wrapper']['#label']);
+
     // Clear job item caches.
     entity_get_controller('tmgmt_job_item')->resetCache();
 
@@ -129,10 +133,18 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $item = $job->addItem('test_source', 'test', '1');
     $item->data = array(
       'wrapper' => array(
-        '#text' => 'Hello world',
+        '#label' => 'Parent label',
+        'subwrapper1' => array(
+          '#text' => 'Hello world',
+          '#label' => 'Sub label 1',
+        ),
+        'subwrapper2' => array(
+          '#text' => 'Hello world again',
+          '#label' => 'Sub label 2',
+        ),
       ),
-      'wrapper2' => array(
-        '#text' => 'Hello world again',
+      'no_label' => array(
+        '#text' => 'No label',
       ),
     );
     $item->save();
@@ -145,8 +157,15 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $items = $job->getItems();
     $item = end($items);
     $data = $item->getData();
-    $this->assertEqual('mt_de_Hello world', $data['wrapper']['#translation']['#text']);
-    $this->assertEqual('mt_de_Hello world again', $data['wrapper2']['#translation']['#text']);
-  }
+    $this->assertEqual('mt_de_Hello world', $data['wrapper']['subwrapper1']['#translation']['#text']);
+    $this->assertEqual('mt_de_Hello world again', $data['wrapper']['subwrapper2']['#translation']['#text']);
 
+    // Verify generated labels/slugs.
+    $this->refreshVariables();
+    $data = variable_get('tmgmt_mygengo_test_data', FALSE);
+    $subwrapper1_key = 'job' . $job->tjid . $item->tjiid . '][wrapper][subwrapper1';
+    $no_label_key = 'job' . $job->tjid . $item->tjiid . '][no_label';
+    $this->assertEqual($data->jobs->$subwrapper1_key->slug, 'Parent label > Sub label 1');
+    $this->assertEqual($data->jobs->$no_label_key->slug, 'No label');
+  }
 }
