@@ -130,6 +130,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $job = $this->createJob();
     $job->settings['quality'] = 'machine';
     $job->translator = $translator->name;
+    $job->save();
     $item = $job->addItem('test_source', 'test', '1');
     $item->data = array(
       'wrapper' => array(
