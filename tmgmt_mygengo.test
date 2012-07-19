@@ -34,8 +34,14 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
   function testAPI() {
     $translator = $this->createTranslator();
     $translator->plugin = 'mygengo';
+
+    /**
+     * @var TMGMTMyGengoTranslatorPluginController $plugin
+     */
+    $plugin = $translator->getController();
+    // Save implicit value for gengo_service_url to be used during tests.
     $translator->settings = array(
-      'url' => url('tmgmt_mygengo_mock/v1.1/', array('absolute' => TRUE)),
+      'gengo_service_url' => $plugin->mockServiceURL,
     );
     $translator->save();
 
@@ -76,7 +82,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $messages = $job->getMessages();
     $message = end($messages);
     $this->assertEqual('error', $message->type);
-    $this->assertEqual('Job has been rejected.', $message->getMessage());
+    $this->assert(strpos($message->getMessage(), 'Job has been rejected') !== FALSE,
+      t('Job should be rejected as we provided wrong api key.'));
 
     // Save a correct api key.
     $translator->settings['api_public_key'] = 'correct key';
@@ -102,6 +109,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
         'body_src' => $data->jobs->$key->body_src,
         'body_tgt' => $data->jobs->$key->lc_tgt . '_' . $data->jobs->$key->body_src,
         'status' => 'approved',
+        'tier' => 'standard',
       )),
     );
     $action = $data->jobs->$key->callback_url;

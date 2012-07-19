@@ -76,3 +76,12 @@ function tmgmt_mygengo_tmgmt_translator_plugin_info() {
 function tmgmt_mygengo_quote($form, &$form_state) {
   return $form['translator_wrapper']['settings']['quote'];
 }
+
+/**
+ * Implements hook_form_ID_alter().
+ *
+ * Attaches javascript needed for gengo form.
+ */
+function tmgmt_mygengo_form_tmgmt_translator_form_alter(&$form, &$form_state) {
+  $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo.toggle_auto_approve.js';
+}

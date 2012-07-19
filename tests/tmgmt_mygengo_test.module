@@ -79,7 +79,7 @@ function tmgmt_mygengo_test_service_translate_response($data) {
     $job->mt = 1;
     $job->unit_count = str_word_count($job->body_src);
     $job->credits = 0;
-    $job->status = 'available';
+    $job->status = 'approved';
     $job->eta = -1;
     $job->ctime = date('Y-m-d H:i:s');
     $data->jobs[][$jobid] = $job;
