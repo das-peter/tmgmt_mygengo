@@ -72,6 +72,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     $sum_unit_count = 0;
 
     foreach ($gengo_jobs as $mygengo_job) {
+      $mygengo_job = reset($mygengo_job);
       $sum_unit_count = $sum_unit_count + $mygengo_job->unit_count;
       $sum_credits = $sum_credits + $mygengo_job->credits;
       $highest_eta = ($mygengo_job->eta > $highest_eta) ? $mygengo_job->eta : $highest_eta;

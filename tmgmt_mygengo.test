@@ -11,6 +11,11 @@
 class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
   /**
+   * @var TMGMTTranslator $translator
+   */
+  protected $translator;
+
+  /**
    * Implements getInfo().
    */
   static function getInfo() {
@@ -26,28 +31,29 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
    */
   function setUp() {
     parent::setUp(array('tmgmt_ui', 'tmgmt_mygengo', 'tmgmt_mygengo_test'));
+
+    $this->translator = tmgmt_translator_load('mygengo');
+
+    /**
+     * @var TMGMTMyGengoTranslatorPluginController $plugin
+     */
+    $plugin = $this->translator->getController();
+    // Save implicit value for gengo_service_url to be used during tests.
+    $this->translator->settings = array(
+      'gengo_service_url' => $plugin->mockServiceURL,
+    );
+    $this->translator->save();
   }
 
   /**
    * Tests basic API methods of the plugin.
    */
   function testAPI() {
-    $translator = $this->createTranslator();
-    $translator->plugin = 'mygengo';
 
-    /**
-     * @var TMGMTMyGengoTranslatorPluginController $plugin
-     */
-    $plugin = $translator->getController();
-    // Save implicit value for gengo_service_url to be used during tests.
-    $translator->settings = array(
-      'gengo_service_url' => $plugin->mockServiceURL,
-    );
-    $translator->save();
 
     $job = $this->createJob();
     $job->settings['quality'] = 'standard';
-    $job->translator = $translator->name;
+    $job->translator = $this->translator->name;
     $item = $job->addItem('test_source', 'test', '1');
     $item->data = array(
       'wrapper' => array(
@@ -62,9 +68,9 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertFalse($job->isTranslatable());
 
     // Save a wrong api key.
-    $translator->settings['api_public_key'] = 'wrong key';
-    $translator->settings['api_private_key'] = 'wrong key';
-    $translator->save();
+    $this->translator->settings['api_public_key'] = 'wrong key';
+    $this->translator->settings['api_private_key'] = 'wrong key';
+    $this->translator->save();
 
     // Make sure the translator returns the correct supported target languages.
     $languages = $job->getTranslator()->getSupportedTargetLanguages('en');
@@ -86,9 +92,9 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
       t('Job should be rejected as we provided wrong api key.'));
 
     // Save a correct api key.
-    $translator->settings['api_public_key'] = 'correct key';
-    $translator->settings['api_private_key'] = 'correct key';
-    $translator->save();
+    $this->translator->settings['api_public_key'] = 'correct key';
+    $this->translator->settings['api_private_key'] = 'correct key';
+    $this->translator->save();
     $this->assertTrue($job->isTranslatable());
 
     $job->requestTranslation();
@@ -137,7 +143,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // Test machine translation.
     $job = $this->createJob();
     $job->settings['quality'] = 'machine';
-    $job->translator = $translator->name;
+    $job->translator = $this->translator->name;
     $job->save();
     $item = $job->addItem('test_source', 'test', '1');
     $item->data = array(
@@ -176,5 +182,86 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $no_label_key = 'job' . $job->tjid . $item->tjiid . '][no_label';
     $this->assertEqual($data->jobs->$subwrapper1_key->slug, 'Parent label > Sub label 1');
     $this->assertEqual($data->jobs->$no_label_key->slug, 'No label');
+  }
+
+  function testJobItemRejection() {
+
+    $this->loginAsAdmin();
+
+    // Make sure we have correct keys.
+    $this->translator->settings['api_public_key'] = 'correct key';
+    $this->translator->settings['api_private_key'] = 'correct key';
+    // Set auto approve.
+    $this->translator->settings['mygengo_auto_approve'] = 1;
+
+    $this->translator->save();
+
+    $job = $this->createJob();
+    $job->settings['quality'] = 'machine';
+    $job->translator = $this->translator->name;
+    $job->save();
+    $item = $job->addItem('test_source', 'test', '1');
+    $item->data = array(
+      'wrapper' => array(
+        '#label' => 'Parent label',
+        'subwrapper' => array(
+          '#text' => 'Hello world',
+          '#label' => 'Sub label 1',
+        ),
+      ),
+    );
+    $item->save();
+
+    $job->requestTranslation();
+
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review');
+
+    // Make sure we got the review tool with source and translation texts.
+    $this->assertText('Hello world');
+    $this->assertText('mt_de_Hello world');
+
+    $this->drupalPost('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review', array(), '✗');
+
+    $key = 'wrapper][subwrapper';
+    // Test if we have correct confirm text.
+    $this->assertText(t('Confirm rejection of @data_item in @job_item', array(
+      '@data_item' => $item->getData(tmgmt_ensure_keys_array($key), '#label'),
+      '@job_item' => $item->label(),
+    )));
+
+    // Submit current page.
+    $this->drupalPost(NULL, NULL, t('Confirm'));
+
+    $this->assertText($item->defaultLabel());
+
+    // Navigate to the review tool and check if the data item is pending.
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review');
+    $state_icon = array_shift($this->xpath('//tr[@id="tmgmt-ui-element-wrapper-subwrapper"]/td[1]/div[@class="tmgmt-ui-state"]'));
+    $this->assertEqual($state_icon->div['title'], t('Pending'));
+
+    // "Translate" data.
+    $this->refreshVariables();
+    $data = variable_get('tmgmt_mygengo_test_data', FALSE);
+    $key = key($data->jobs);
+    $post = array(
+      'job' => json_encode(array(
+        'custom_data' => $data->jobs->$key->custom_data,
+        'body_src' => $data->jobs->$key->body_src,
+        'body_tgt' => $data->jobs->$key->lc_tgt . '_' . $data->jobs->$key->body_src . '_reviewed',
+        'status' => 'approved',
+        'tier' => 'standard',
+      )),
+    );
+    $action = $data->jobs->$key->callback_url;
+    $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
+
+    // Response should be empty if everything went ok.
+    $this->assertResponse(200);
+    $this->assertTrue(empty($out));
+
+    // See if we have source and translation texts populated correctly.
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review');
+    $this->assertText('Hello world');
+    $this->assertText('de_Hello world_reviewed');
   }
 }
