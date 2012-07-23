@@ -223,11 +223,10 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         // object.
         $response_job = reset($response_job);
 
-        // If tier is "machine", API returns translation immediately.
-        if ($response_job->tier == 'machine') {
-          $key = array_slice(tmgmt_ensure_keys_array($response_job->custom_data), 1);
-          $this->receiveTranslation($job, $key, $response_job);
-        }
+        // We might already get translated data, so run translation save
+        // to capture it.
+        $key = array_slice(tmgmt_ensure_keys_array($response_job->custom_data), 1);
+        $this->saveTranslation($job, $key, $response_job);
       }
 
       $job->submitted(t('Job has been submitted.'));
@@ -242,8 +241,12 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   /**
    * Receives and stores a translation returned by myGengo.
    */
-  public function receiveTranslation(TMGMTJob $job, $keys, $data) {
-    if ($data->status == 'approved') {
+  public function saveTranslation(TMGMTJob $job, $keys, $data) {
+    // Try to add translation for both statuses - approved and available.
+    // In case a translation is not new or not in state pending the
+    // translation will not be updated anyway. This is handled in
+    // TMGMTJobItem::addTranslatedDataRecursive().
+    if ($data->status == 'approved' || $data->status == 'available') {
       $keys = tmgmt_ensure_keys_array($keys);
       $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
     }

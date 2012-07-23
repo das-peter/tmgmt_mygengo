@@ -26,6 +26,7 @@ function tmgmt_mygengo_test_menu() {
  * Page callback for getting the supported languages.
  */
 function tmgmt_mygengo_test_service_get_languages() {
+
   $languages = array(
     'de' => array(
       'lc_tgt' => 'de',
@@ -48,41 +49,90 @@ function tmgmt_mygengo_test_service_get_languages() {
 }
 
 /*
- * Page callback for getting the supported languages.
+ * Gengo mock service.
  */
 function tmgmt_mygengo_test_service_translate() {
-  $opstat = 'failure';
 
-  if ($_POST['api_key'] == 'correct key') {
-    $sig = hash_hmac('sha1', $_POST['ts'], 'correct key');
-    if ($sig == $_POST['api_sig']) {
-      $opstat = 'ok';
-      $data = json_decode($_POST['data']);
-      variable_set('tmgmt_mygengo_test_data', $data);
+  tmgmt_mygengo_test_authenticate();
+
+  $response = new stdClass();
+
+  // Use case when jobs have been submitted to gengo.
+  if (!empty($_POST['data'])) {
+    $data = json_decode($_POST['data']);
+
+    foreach ($data->jobs as $id => $job) {
+      // Machine translation - simulate returning translation job right away.
+      if ($job->tier == 'machine') {
+        $body_tgt = 'mt_de_' . $job->body_src;
+        $response->jobs[][$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'approved', $job->tier, $job->custom_data, $job->slug);
+      }
+      // Hack to tell mock service that translation should be returned right
+      // away as available.
+      elseif (strpos($job->body_src, 'Lazy-Loading') !== FALSE) {
+        $body_tgt = str_replace('Lazy-Loading', 'Translated', $job->body_src);
+        $response->jobs[][$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'available', $job->tier, $job->custom_data, $job->slug);
+      }
+      // Otherwise we have submitted a job, however just return the job object
+      // without translation and in pending state.
+      else {
+        $response->jobs[][$id] = tmgmt_mygengo_test_build_response_job($job->body_src, NULL, 'pending', $job->tier, $job->custom_data, $job->slug);
+      }
     }
   }
 
+  // Save the response so that it can be further examined.
+  variable_set('tmgmt_mygengo_test_last_gengo_response', $response);
+
   drupal_json_output(array(
-    'opstat' => $opstat,
-    'response' => $opstat == 'ok' ? tmgmt_mygengo_test_service_translate_response($data) : '',
+    'opstat' => 'ok',
+    'response' => $response,
   ));
 }
 
 /**
- * Convert submitted job data into a response.
+ * Helper function to build gengo job.
  */
-function tmgmt_mygengo_test_service_translate_response($data) {
-  $jobs = $data->jobs;
-  $data->jobs = array();
-  foreach ($jobs as $jobid => $job) {
-    $job->body_tgt = 'mt_' . $job->lc_tgt . '_' . $job->body_src;
-    $job->mt = 1;
-    $job->unit_count = str_word_count($job->body_src);
-    $job->credits = 0;
-    $job->status = 'approved';
-    $job->eta = -1;
-    $job->ctime = date('Y-m-d H:i:s');
-    $data->jobs[][$jobid] = $job;
+function tmgmt_mygengo_test_build_response_job($body_src, $body_tgt, $status, $tier, $custom_data, $slug) {
+
+  $job = new stdClass();
+  $job->lc_src = 'en';
+  $job->lc_tgt = 'de';
+  $job->body_src = $body_src;
+  $job->unit_count = str_word_count($job->body_src);
+  // Fake credit calculation.
+  $job->credits = $job->unit_count * .4;
+  $job->status = $status;
+  $job->tier = $tier;
+  $job->custom_data = $custom_data;
+  $job->slug = $slug;
+
+  // Add translation if available.
+  if (!empty($body_tgt)) {
+    $job->body_tgt = $body_tgt;
   }
-  return $data;
+
+  return $job;
+}
+
+/**
+ * Helper function to run authentication.
+ */
+function tmgmt_mygengo_test_authenticate() {
+
+  if ($_POST['api_key'] == 'correct key') {
+    $sig = hash_hmac('sha1', $_POST['ts'], 'correct key');
+    if ($sig == $_POST['api_sig']) {
+      return;
+    }
+  }
+
+  drupal_json_output(array(
+    'opstat' => 'failure',
+    // We do not really need a response here.
+    'response' => '',
+  ));
+
+  // In case of error we do not want to continue.
+  drupal_exit();
 }

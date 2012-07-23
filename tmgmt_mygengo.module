@@ -33,7 +33,7 @@ function tmgmt_mygengo_callback() {
 
   $job = tmgmt_job_load($tjid);
   $mygengo = $job->getTranslator()->getController();
-  $mygengo->receiveTranslation($job, $keys, $data);
+  $mygengo->saveTranslation($job, $keys, $data);
   echo '';
 }
 

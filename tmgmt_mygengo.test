@@ -50,7 +50,6 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
    */
   function testAPI() {
 
-
     $job = $this->createJob();
     $job->settings['quality'] = 'standard';
     $job->translator = $this->translator->name;
@@ -97,39 +96,42 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->translator->save();
     $this->assertTrue($job->isTranslatable());
 
+    // Note that requesting translation goes with default
+    // gengo_auto_approve = 1
     $job->requestTranslation();
-    // Check that job is active.
+    // And therefore the job should be active
     $this->assertTrue($job->isActive());
     foreach ($job->getItems() as $item) {
       $this->assertTrue($item->isActive());
     }
 
-    // "Translate" data.
-    $this->refreshVariables();
-    $data = variable_get('tmgmt_mygengo_test_data', FALSE);
+    // Create a gengo response of translated and approved job.
+    $post['job'] = json_encode(tmgmt_mygengo_test_build_response_job(
+      'Hello world',
+      'Hallo Welt',
+      'approved',
+      'standard',
+      implode('][', array($job->tjid, $item->tjiid, 'wrapper')),
+      $item->data['wrapper']['#label']
+    ));
 
-    $key = key($data->jobs);
-    $post = array(
-      'job' => json_encode(array(
-        'custom_data' => $data->jobs->$key->custom_data,
-        'body_src' => $data->jobs->$key->body_src,
-        'body_tgt' => $data->jobs->$key->lc_tgt . '_' . $data->jobs->$key->body_src,
-        'status' => 'approved',
-        'tier' => 'standard',
-      )),
-    );
-    $action = $data->jobs->$key->callback_url;
+    $action = url('tmgmt_mygengo_callback', array('absolute' => TRUE));
     $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
 
     // Response should be empty if everything went ok.
     $this->assertResponse(200);
     $this->assertTrue(empty($out));
 
-    // Verify the label/slug.
-    $this->assertEqual($data->jobs->$key->slug, $item->data['wrapper']['#label']);
-
     // Clear job item caches.
     entity_get_controller('tmgmt_job_item')->resetCache();
+
+    // Verify the label/slug.
+    $this->refreshVariables();
+    $data = variable_get('tmgmt_mygengo_test_last_gengo_response', FALSE);
+    // Find the key under which we can access the job received:
+    $jobs = $data->jobs;
+    $key = array_shift(array_keys(array_shift($jobs)));
+    $this->assertEqual($data->jobs[0][$key]->slug, $item->data['wrapper']['#label']);
 
     // Now it should be needs review.
     foreach ($job->getItems() as $item) {
@@ -138,7 +140,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $items = $job->getItems();
     $item = end($items);
     $data = $item->getData();
-    $this->assertEqual('de_Hello world', $data['wrapper']['#translation']['#text']);
+    $this->assertEqual('Hallo Welt', $data['wrapper']['#translation']['#text']);
 
     // Test machine translation.
     $job = $this->createJob();
@@ -172,16 +174,26 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $items = $job->getItems();
     $item = end($items);
     $data = $item->getData();
+    // If received a job item with tier machine the mock service will prepend
+    // mt_de_ to the source text.
     $this->assertEqual('mt_de_Hello world', $data['wrapper']['subwrapper1']['#translation']['#text']);
     $this->assertEqual('mt_de_Hello world again', $data['wrapper']['subwrapper2']['#translation']['#text']);
 
     // Verify generated labels/slugs.
     $this->refreshVariables();
-    $data = variable_get('tmgmt_mygengo_test_data', FALSE);
+    $data = variable_get('tmgmt_mygengo_test_last_gengo_response', FALSE);
+    $jobs = array();
+
+    // Process response data so that we can do tests for slug.
+    foreach ($data->jobs as $job_item) {
+      $key = array_shift(array_keys($job_item));
+      $jobs[$key] = array_shift($job_item);
+    }
+
     $subwrapper1_key = 'job' . $job->tjid . $item->tjiid . '][wrapper][subwrapper1';
     $no_label_key = 'job' . $job->tjid . $item->tjiid . '][no_label';
-    $this->assertEqual($data->jobs->$subwrapper1_key->slug, 'Parent label > Sub label 1');
-    $this->assertEqual($data->jobs->$no_label_key->slug, 'No label');
+    $this->assertEqual($jobs[$subwrapper1_key]->slug, 'Parent label > Sub label 1');
+    $this->assertEqual($jobs[$no_label_key]->slug, 'No label');
   }
 
   function testJobItemRejection() {
@@ -191,8 +203,6 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // Make sure we have correct keys.
     $this->translator->settings['api_public_key'] = 'correct key';
     $this->translator->settings['api_private_key'] = 'correct key';
-    // Set auto approve.
-    $this->translator->settings['mygengo_auto_approve'] = 1;
 
     $this->translator->save();
 
@@ -222,10 +232,10 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     $this->drupalPost('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review', array(), '✗');
 
-    $key = 'wrapper][subwrapper';
+    $item_wrapper_key = 'wrapper][subwrapper';
     // Test if we have correct confirm text.
     $this->assertText(t('Confirm rejection of @data_item in @job_item', array(
-      '@data_item' => $item->getData(tmgmt_ensure_keys_array($key), '#label'),
+      '@data_item' => $item->getData(tmgmt_ensure_keys_array($item_wrapper_key), '#label'),
       '@job_item' => $item->label(),
     )));
 
@@ -239,20 +249,18 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $state_icon = array_shift($this->xpath('//tr[@id="tmgmt-ui-element-wrapper-subwrapper"]/td[1]/div[@class="tmgmt-ui-state"]'));
     $this->assertEqual($state_icon->div['title'], t('Pending'));
 
-    // "Translate" data.
-    $this->refreshVariables();
-    $data = variable_get('tmgmt_mygengo_test_data', FALSE);
-    $key = key($data->jobs);
-    $post = array(
-      'job' => json_encode(array(
-        'custom_data' => $data->jobs->$key->custom_data,
-        'body_src' => $data->jobs->$key->body_src,
-        'body_tgt' => $data->jobs->$key->lc_tgt . '_' . $data->jobs->$key->body_src . '_reviewed',
-        'status' => 'approved',
-        'tier' => 'standard',
-      )),
-    );
-    $action = $data->jobs->$key->callback_url;
+    // Create a gengo response of translated and approved job that will be
+    // sent as reviewed translation of previously rejected data item.
+    $post['job'] = json_encode(tmgmt_mygengo_test_build_response_job(
+      'Hello world',
+      'Hallo Welt reviewed',
+      'approved',
+      'standard',
+      implode('][', array($job->tjid, $item->tjiid, $item_wrapper_key)),
+      $item->data['wrapper']['#label']
+    ));
+
+    $action = url('tmgmt_mygengo_callback', array('absolute' => TRUE));
     $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
 
     // Response should be empty if everything went ok.
@@ -262,6 +270,68 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // See if we have source and translation texts populated correctly.
     $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review');
     $this->assertText('Hello world');
-    $this->assertText('de_Hello world_reviewed');
+    $this->assertText('Hallo Welt reviewed');
+  }
+
+  function testAvailableStatus() {
+    $this->loginAsAdmin();
+
+    // Make sure we have correct keys.
+    $this->translator->settings['api_public_key'] = 'correct key';
+    $this->translator->settings['api_private_key'] = 'correct key';
+
+    $this->translator->save();
+
+    $job = $this->createJob();
+    // Set quality to machine so it gets translated right away.
+    $job->settings['quality'] = 'machine';
+    $job->translator = $this->translator->name;
+    $job->save();
+    $item = $job->addItem('test_source', 'test', '1');
+    $item->data = array(
+      'wrapper' => array(
+        '#label' => 'Parent label',
+        'subwrapper' => array(
+          '#text' => 'Hello world',
+          '#label' => 'Sub label 1',
+        ),
+      ),
+    );
+    $item->save();
+
+    $job->requestTranslation();
+
+    // Make sure machine translation was received.
+    entity_get_controller('tmgmt_job_item')->resetCache();
+    $items = $job->getItems();
+    $item = end($items);
+    $data = $item->getData();
+    $this->assertEqual('mt_de_Hello world', $data['wrapper']['subwrapper']['#translation']['#text']);
+
+    // Create another job with "same source" text. The translator service will
+    // return an existing translation with status available.
+    $job = $this->createJob();
+    // Tell the mock service to return available translation.
+    $job->settings['quality'] = 'availablestandard';
+    $job->translator = $this->translator->name;
+    $job->save();
+    $item = $job->addItem('test_source', 'test', '1');
+    $item->data = array(
+      'wrapper' => array(
+        '#label' => 'Text label',
+        '#text' => 'Lazy-Loading Some text that has been submitted and translated.',
+      ),
+    );
+    $item->save();
+
+    $job->requestTranslation();
+
+    // See if available translation from gengo has updated our translation.
+    entity_get_controller('tmgmt_job_item')->resetCache();
+    $items = $job->getItems();
+    $item = end($items);
+    $data = $item->getData();
+    $this->assertEqual('Translated Some text that has been submitted and translated.', $data['wrapper']['#translation']['#text']);
+
   }
 }
