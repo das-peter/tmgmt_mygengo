@@ -279,7 +279,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
     try {
       $targets = $this->requestFromGengo($translator, 'translate/service/language_pairs',
-        'GET', array('lc_src' => $source_language, 'tier' => 'machine'));
+        'GET', array('lc_src' => $source_language));
       foreach ($targets as $target) {
         $results[$target->lc_tgt] = $target->lc_tgt;
       }
@@ -303,6 +303,17 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    */
   protected function gengoFetchJob(TMGMTTranslator $translator, $gengo_job_id) {
     return $this->requestFromGengo($translator, 'translate/job/' . $gengo_job_id, 'GET');
+  }
+
+  public function canTranslate(TMGMTTranslator $translator, TMGMTJob $job) {
+
+    $target_lang = $this->mapToGengoLangCode($job->target_language);
+    $source_lang = $this->mapToGengoLangCode($job->source_language);
+
+    if ($this->isAvailable($translator) && array_key_exists($target_lang, $translator->getSupportedTargetLanguages($source_lang))) {
+      return TRUE;
+    }
+    return FALSE;
   }
 
   /**
