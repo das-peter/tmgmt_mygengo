@@ -64,15 +64,30 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
      */
     $plugin = tmgmt_translator_plugin_controller($this->pluginType);
 
-    $job->settings['quality'] = !empty($form_state['values']['settings']['quality']) ? $form_state['values']['settings']['quality'] : 'machine';
-    $gengo_jobs = $plugin->gengoSendJob($job);
+    $job->settings['quality'] = !empty($form_state['values']['settings']['quality']) ? $form_state['values']['settings']['quality'] : 'standard';
+    $gengo_jobs = array();
+
+    $err_msg = NULL;
+    $err_code = NULL;
+
+    try {
+      $gengo_jobs = $plugin->gengoSendJob($job);
+    }
+    catch (TMGMTException $e) {
+      $err_msg = $e->getMessage();
+      // This contains Gengo error code - we might have a use for it at some
+      // point.
+      $err_code = $e->getCode();
+    }
 
     $sum_credits = 0;
     $highest_eta = '';
     $sum_unit_count = 0;
 
     foreach ($gengo_jobs as $mygengo_job) {
-      $mygengo_job = reset($mygengo_job);
+      if (is_array($mygengo_job)) {
+        $mygengo_job = array_shift($mygengo_job);
+      }
       $sum_unit_count = $sum_unit_count + $mygengo_job->unit_count;
       $sum_credits = $sum_credits + $mygengo_job->credits;
       $highest_eta = ($mygengo_job->eta > $highest_eta) ? $mygengo_job->eta : $highest_eta;
@@ -90,20 +105,27 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
         'machine' => t('Machine'),
         'standard' => t('Standard'),
         'pro' => t('Pro'),
-        'ultra' => t('Ultra'),
+
+        // We are waiting till gengo service will support ultra translations
+        // for grouped jobs.
+        // 'ultra' => t('Ultra'),
       ),
+      '#default_value' => $job->settings['quality'],
       '#description' => t('With which Quality you want to translate?'),
       '#ajax' => array(
-        'callback' => 'tmgmt_mygengo_quote',
-        'wrapper' => 'mygengo-quote',
+        'callback' => 'tmgmt_ui_ajax_callback_translator_select',
+        'wrapper' => 'tmgmt-ui-translator-settings',
       ),
     );
     $settings['quote'] = array(
       '#type' => 'fieldset',
       '#title' => t('Quote'),
-      '#prefix' => '<div id="mygengo-quote">',
-      '#suffix' => '</div>',
     );
+    if (!empty($err_msg)) {
+      $settings['quote']['error_msg'] = array(
+        '#markup' => '<div class="messages error">' . $err_msg . '</div>'
+      );
+    }
     $settings['quote']['needed_credits'] = array(
       '#type' => 'item',
       '#title' => t('Needed Credits'),
@@ -114,6 +136,13 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#title' => t('ETA'),
       '#markup' => format_date(mktime() + $highest_eta, "long"),
     );
+
+    $settings['comment'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Instructions'),
+      '#description' => t('You can provide a set of instructions so that the translator will better understand your requirements.'),
+    );
+
     return $settings;
   }
 }

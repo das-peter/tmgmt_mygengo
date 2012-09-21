@@ -9,12 +9,12 @@
  * Implements hook_menu().
  */
 function tmgmt_mygengo_test_menu() {
-  $items['tmgmt_mygengo_mock/v1.1/translate/jobs'] = array(
+  $items['tmgmt_mygengo_mock/v2/translate/jobs'] = array(
     'page callback' => 'tmgmt_mygengo_test_service_translate',
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
-  $items['tmgmt_mygengo_mock/v1.1/translate/service/language_pairs'] = array(
+  $items['tmgmt_mygengo_mock/v2/translate/service/language_pairs'] = array(
     'page callback' => 'tmgmt_mygengo_test_service_get_languages',
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,

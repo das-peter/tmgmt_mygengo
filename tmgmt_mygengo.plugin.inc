@@ -28,7 +28,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    *
    * @var string
    */
-  protected $apiVersion = 'v1.1';
+  protected $apiVersion = 'v2';
 
   /**
    * Tels the send job logic to send the job item only with single data item.
@@ -50,6 +50,15 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * @var string
    */
   protected $serviceComment;
+
+  /**
+   * Mapping table of Drupal lang codes to Gengo lang codes.
+   *
+   * @var array
+   */
+  protected $langCodesMapping = array(
+    'zh-hans' => 'zh-hk',
+  );
 
 
   /**
@@ -195,8 +204,13 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     }
 
     // If we get to this point it is definitely an error state.
-    $error_msg = isset($results->err->msg) ? $results->err->msg : 'Unknown error.';
-    throw new TMGMTException('MyGengo service returned following error: @error', array('@error' => $error_msg));
+    // Get only the first error as we cannot effectively handle multiple error
+    // states. It is highly probable that the error would have been the same
+    // anyway.
+    $gengo_err = reset($results->err);
+    $gengo_err = array_shift($gengo_err);
+
+    throw new TMGMTException('MyGengo service returned following error: <strong>@error</strong>', array('@error' => $gengo_err->msg), $gengo_err->code);
   }
 
   /**
@@ -217,6 +231,11 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function requestTranslation(TMGMTJob $job) {
 
     try {
+
+      // Check if we have comment from user input and if yes, set it to be sent.
+      if (!empty($job->settings['comment'])) {
+        $this->setServiceComment($job->settings['comment']);
+      }
 
       foreach ($this->gengoSendJob($job) as $response_job) {
         // The response is an array of objects, each job is wrapped in another
@@ -260,7 +279,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
     try {
       $targets = $this->requestFromGengo($translator, 'translate/service/language_pairs',
-        'GET', array('lc_src' => $source_language));
+        'GET', array('lc_src' => $source_language, 'tier' => 'machine'));
       foreach ($targets as $target) {
         $results[$target->lc_tgt] = $target->lc_tgt;
       }
@@ -329,21 +348,12 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         continue;
       }
 
-      // NOTE: There's a not-so-fun-bug in the myGengo API that you'll encounter
-      // if you change how this key is set. If the key in this hash starts with
-      // numbers (especially a 0...), you will get an odd one-off response format
-      // that can't be parsed by default.
-      //
-      // This is being fixed in a future iteration of the API (v2). If you encounter
-      // weirdness with this issue, feel free to email us at api@mygengo.com. ;)
-      //
-      // - Ryan McGrath, who dislikes this error intensely
       $translations['job' . $job->tjid . $key] = array(
         'type' => 'text',
         'slug' => tmgmt_data_item_label($value),
         'body_src' => $value['#text'],
-        'lc_src' => $job->source_language,
-        'lc_tgt' => $job->target_language,
+        'lc_src' => $this->mapToGengoLangCode($job->source_language),
+        'lc_tgt' => $this->mapToGengoLangCode($job->target_language),
         'tier' => $job->settings['quality'],
         'callback_url' => url('tmgmt_mygengo_callback', array('absolute' => TRUE)),
         'custom_data' => $job->tjid . '][' . $key,
@@ -353,7 +363,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       if (!empty($this->serviceComment)) {
         $translations['job' . $job->tjid . $key]['comment'] = $this->serviceComment;
       }
-
       // If singleDataItemKey is set and we have reached this point we are going
       // to resubmit an existing data item as a new gengo job item. Therefore
       // we need to set force flag to create a new gengo job and not to get
@@ -371,5 +380,21 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     ));
 
     return $response->jobs;
+  }
+
+  /**
+   * Maps Drupal lang code to Gengo lang code.
+   *
+   * @param string $drupal_code
+   *
+   * @return string
+   *   Lang code.
+   */
+  protected function mapToGengoLangCode($drupal_code) {
+    if (isset($this->langCodesMapping[$drupal_code])) {
+      return $this->langCodesMapping[$drupal_code];
+    }
+
+    return $drupal_code;
   }
 }
