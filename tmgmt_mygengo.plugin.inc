@@ -57,7 +57,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * @var array
    */
   protected $langCodesMapping = array(
-    'zh-hans' => 'zh-hk',
+    'zh-hans' => 'zh',
+    'ja' => 'jp',
   );
 
 
