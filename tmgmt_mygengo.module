@@ -27,6 +27,7 @@ function tmgmt_mygengo_menu() {
  * Process response from mygengo.
  */
 function tmgmt_mygengo_callback() {
+
   $data = json_decode($_POST['job']);
   $keys = explode('][', $data->custom_data);
   $tjid = array_shift($keys);

@@ -51,6 +51,12 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#prefix' => '<div class="mygengo-use-sandbox">',
       '#suffix' => '</div>',
     );
+    $form['use_preferred'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Use preferred translators'),
+      '#default_value' => $translator->getSetting('use_preferred'),
+      '#description' => t('Check to use translators from the preferred translators list associated with your MyGengo account.'),
+    );
 
     return parent::pluginSettingsForm($form, $form_state, $translator, $busy);
   }
@@ -65,33 +71,10 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     $plugin = tmgmt_translator_plugin_controller($this->pluginType);
 
     $job->settings['quality'] = !empty($form_state['values']['settings']['quality']) ? $form_state['values']['settings']['quality'] : 'standard';
-    $gengo_jobs = array();
 
-    $err_msg = NULL;
-    $err_code = NULL;
-
-    try {
-      $gengo_jobs = $plugin->gengoSendJob($job);
-    }
-    catch (TMGMTException $e) {
-      $err_msg = $e->getMessage();
-      // This contains Gengo error code - we might have a use for it at some
-      // point.
-      $err_code = $e->getCode();
-    }
-
-    $sum_credits = 0;
-    $highest_eta = '';
-    $sum_unit_count = 0;
-
-    foreach ($gengo_jobs as $mygengo_job) {
-      if (is_array($mygengo_job)) {
-        $mygengo_job = array_shift($mygengo_job);
-      }
-      $sum_unit_count = $sum_unit_count + $mygengo_job->unit_count;
-      $sum_credits = $sum_credits + $mygengo_job->credits;
-      $highest_eta = ($mygengo_job->eta > $highest_eta) ? $mygengo_job->eta : $highest_eta;
-    }
+    $sum_unit_count = $job->getWordCount();
+    $sum_credits = $sum_unit_count * $plugin
+        ->getUnitPrice($job->getTranslator(), $job->source_language, $job->target_language, $job->settings['quality']);
 
     $settings['word_count'] = array(
       '#type' => 'item',
@@ -131,11 +114,12 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#title' => t('Needed Credits'),
       '#markup' => $sum_credits,
     );
-    $settings['quote']['eta'] = array(
-      '#type' => 'item',
-      '#title' => t('ETA'),
-      '#markup' => format_date(mktime() + $highest_eta, "long"),
-    );
+    // We are not able to retrieve this info without submitting the job.
+//    $settings['quote']['eta'] = array(
+//      '#type' => 'item',
+//      '#title' => t('ETA'),
+//      '#markup' => format_date(mktime() + $highest_eta, "long"),
+//    );
 
     $settings['comment'] = array(
       '#type' => 'textarea',

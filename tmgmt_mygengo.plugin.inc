@@ -60,6 +60,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     'zh-hans' => 'zh',
   );
 
+  protected $language_pairs;
+
 
   /**
    * Sets comment to be sent to gengo service with job post request.
@@ -149,7 +151,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * @param $method
    * @param array $data
    *
-   * @return array
+   * @return object
    * @throws TMGMTException
    */
   public function requestFromGengo(TMGMTTranslator $translator, $endpoint, $method, $data = array()) {
@@ -226,7 +228,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   /**
    * Implements TMGMTTranslatorPluginControllerInterface::requestTranslation().
    *
-   * Here we will acutally query source and get translations.
+   * Here we will actually query source and get translations.
    */
   public function requestTranslation(TMGMTJob $job) {
 
@@ -238,6 +240,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       }
 
       foreach ($this->gengoSendJob($job) as $response_job) {
+
+        // Duplicate content has been submitted.
+        if (isset($response_job->duplicate)) {
+          // TODO - we need to handle duplicates in some way as client will not
+          // receive translation for this item.
+          continue;
+        }
+
         // The response is an array of objects, each job is wrapped in another
         // object.
         $response_job = reset($response_job);
@@ -278,17 +288,58 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     $results = array();
 
     try {
-      $targets = $this->requestFromGengo($translator, 'translate/service/language_pairs',
-        'GET', array('lc_src' => $source_language));
-      foreach ($targets as $target) {
+      $this->language_pairs = $this->requestFromGengo($translator, 'translate/service/language_pairs',
+        'GET', array('lc_src' => $this->mapToGengoLangCode($source_language)));
+
+      foreach ($this->language_pairs as $target) {
         $results[$target->lc_tgt] = $target->lc_tgt;
       }
     }
     catch (TMGMTException $e) {
-      watchdog_exception('tmgmt', $e, 'Unable to retrieve a list of available languages.');
+      watchdog_exception('tmgmt', $e);
     }
 
     return $results;
+  }
+
+  /**
+   * Helper method to get unit price for source/target languages and tier.
+   *
+   * @param TMGMTTranslator $translator
+   * @param $source_language
+   * @param $target_language
+   * @param $tier
+   *
+   * @return mixed
+   *   In case of success a double value.
+   *   In case of failure a boolean FALSE.
+   */
+  public function getUnitPrice(TMGMTTranslator $translator, $source_language, $target_language, $tier) {
+
+    // Send request only in case we did not call getSupportedTargetLanguages()
+    // prior to calling this method.
+    if (empty($this->language_pairs)) {
+      try {
+        $this->language_pairs = $this->requestFromGengo($translator, 'translate/service/language_pairs',
+          'GET', array('lc_src' => $this->mapToGengoLangCode($source_language)));
+      }
+      catch (TMGMTException $e) {
+        watchdog_exception('tmgmt', $e);
+        return FALSE;
+      }
+    }
+
+    foreach ($this->language_pairs as $target) {
+      if (
+        $target->lc_tgt == $this->mapToGengoLangCode($target_language) &&
+        $target->lc_src == $this->mapToGengoLangCode($source_language) &&
+        $target->tier == $tier
+      ) {
+        return $target->unit_price;
+      }
+    }
+
+    return FALSE;
   }
 
   /**
@@ -369,6 +420,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         'callback_url' => url('tmgmt_mygengo_callback', array('absolute' => TRUE)),
         'custom_data' => $job->tjid . '][' . $key,
         'auto_approve' => (int) $job->getTranslator()->getSetting('mygengo_auto_approve'),
+        'use_preferred' => (int) $job->getTranslator()->getSetting('use_preferred'),
       );
 
       if (!empty($this->serviceComment)) {
@@ -390,7 +442,11 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       'as_group' => (int) (count($translations) > 1),
     ));
 
-    return $response->jobs;
+    if (isset($response->jobs)) {
+      return $response->jobs;
+    }
+
+    return array();
   }
 
   /**
