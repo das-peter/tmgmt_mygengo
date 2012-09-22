@@ -437,7 +437,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
     $response = $this->requestFromGengo($job->getTranslator(), 'translate/jobs', 'POST', array(
       'jobs' => $translations,
-      'process' => 1,
       // In case we send one job item as group we will get error from Gengo.
       'as_group' => (int) (count($translations) > 1),
     ));
