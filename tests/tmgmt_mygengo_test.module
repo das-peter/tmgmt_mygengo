@@ -131,6 +131,7 @@ function tmgmt_mygengo_test_authenticate() {
     'opstat' => 'failure',
     // We do not really need a response here.
     'response' => '',
+    'err' => array(array((object)array('msg' => 'Authentication failure', 'code' => 100))),
   ));
 
   // In case of error we do not want to continue.
