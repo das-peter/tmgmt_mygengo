@@ -4,9 +4,26 @@
  * @file
  * Module file of the translation management mygengo module.
  *
- * http://mygengo.com/
+ * Credits:
+ * Originally implemented by Ryan McGrath, myGengo. Reworked and added new
+ * features by MDSystems.
  *
- * Implemented by Ryan McGrath, myGengo
+ * TMGMT vs myGengo jobs
+ * =====================
+ * TMGMT manages translation jobs which are containers for job items and those
+ * are divided into data items.
+ *
+ * myGengo's job is at the level of TMGMGT data items. When a TMGMT job is sent
+ * to myGengo all the data items are sent as grouped myGengo jobs.
+ *
+ * TODOs
+ * =====================
+ * 1) With the poll feature we added a mapping table of data items to myGengo jobs.
+ * Therefore it is possible to implement regular review-reject process instead
+ * of current feature which submits a completely new job to myGengo.
+ *
+ * 2) Do we need access check? Review possible scenarios and either remove it
+ * completely or add some meaning full access control.
  */
 
 /**
@@ -21,6 +38,71 @@ function tmgmt_mygengo_menu() {
     'access callback' => 'tmgmt_mygengo_access_check'
   );
   return $items;
+}
+
+/**
+ * Implements hook_form_ID_alter().
+ *
+ * Adds poll action button into job checkout page.
+ */
+function tmgmt_mygengo_form_tmgmt_job_form_alter(&$form, &$form_state) {
+  /**
+   * @var TMGMTJob $job
+   */
+  $job = $form_state['tmgmt_job'];
+
+  if (!empty($job) && $job->isActive()) {
+    $form['actions']['poll'] = array(
+      '#type' => 'submit',
+      '#value' => t('Poll translations'),
+      '#submit' => array('_tmgmt_mygengo_poll_submit'),
+      '#weight' => -10,
+    );
+  }
+}
+
+/**
+ * Submit callback to poll translations form myGengo.
+ */
+function _tmgmt_mygengo_poll_submit($form, &$form_state) {
+  /**
+   * @var TMGMTJob $job
+   */
+  $job = $form_state['tmgmt_job'];
+
+  $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m');
+  $select->condition('tjid', $job->tjid);
+
+  $result = $select->execute()->fetchAll();
+
+  if (empty($result)) {
+    drupal_set_message(t('No myGengo mapping records found for this translation jobs.'), 'error');
+    return;
+  }
+
+  $gengo_mappings = array();
+  foreach ($result as $row) {
+    $gengo_mappings[$row->gjid] = $row->data_item_key;
+  }
+
+  /**
+   * @var TMGMTMyGengoTranslatorPluginController $controller
+   */
+  $controller = $job->getTranslator()->getController();
+  $response = $controller->requestFromGengo($job->getTranslator(), 'translate/jobs/' . implode(',', array_keys($gengo_mappings)), 'GET');
+
+  if (!empty($response->jobs)) {
+    foreach ($response->jobs as $response_job) {
+      $controller->saveTranslation($job, $gengo_mappings[$response_job->job_id], $response_job);
+    }
+
+    drupal_set_message(t('All available translations from myGengo have been polled.'));
+  }
+  else {
+    drupal_set_message(t('myGengo did not provide any translations.'));
+    watchdog('tmgmt_mygengo', 'Error polling translations from myGengo with response @response',
+      array('@response' => var_export($response, TRUE)), WATCHDOG_WARNING);
+  }
 }
 
 /**

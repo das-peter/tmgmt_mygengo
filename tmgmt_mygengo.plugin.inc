@@ -10,6 +10,8 @@
  */
 class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController implements TMGMTTranslatorRejectDataItem {
 
+  public $debug = TRUE;
+
   /**
    * Translation service URL.
    *
@@ -167,10 +169,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
     $url = $this->getServiceUrl($translator) . '/' . $endpoint;
 
-    /**
-     *  If it's a GET or DELETE request, just sign it and send it appropriately. PUT/POST
-     *  get a little more annoying...
-     */
     if ($method == 'GET' || $method == 'DELETE') {
       $query = array_merge(array(
         'api_key' => $translator->getSetting('api_public_key'),
@@ -194,8 +192,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       $response = drupal_http_request($url, $options);
     }
 
+    if ($this->debug == TRUE) {
+      watchdog('tmgmt_mygengo', "Sending request to gengo at @url with data @data\n\nResponse: @response", array(
+        '@url' => $url,
+        '@data' => var_export($options, TRUE),
+        '@response' => var_export($response, TRUE),
+      ), WATCHDOG_DEBUG);
+    }
+
     if ($response->code != 200) {
-      throw new TMGMTException('Unable to connect to MyGengo service due to following error: @error at @url',
+      throw new TMGMTException('Unable to connect to myGengo service due to following error: @error at @url',
         array('@error' => $response->error, '@url' => $url));
     }
 
@@ -239,7 +245,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         $this->setServiceComment($job->settings['comment']);
       }
 
-      foreach ($this->gengoSendJob($job) as $response_job) {
+      foreach ($this->gengoSendJob($job) as $key => $response_job) {
 
         // Duplicate content has been submitted.
         if (isset($response_job->duplicate)) {
@@ -248,14 +254,33 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
           continue;
         }
 
-        // The response is an array of objects, each job is wrapped in another
-        // object.
-        $response_job = reset($response_job);
+        if ($this->debug) {
+          watchdog('tmgmt_mygengo', 'Job submitted. Received response job @response',
+            array('@response' => var_export($response_job, TRUE)), WATCHDOG_DEBUG);
+        }
+
+        // For machine translations the job is not wrapped in another object
+        // however for human translations it is. So try to cope with this
+        // gengo system variety.
+        if (!isset($response_job->custom_data)) {
+          $response_job = reset($response_job);
+        }
 
         // We might already get translated data, so run translation save
         // to capture it.
-        $key = array_slice(tmgmt_ensure_keys_array($response_job->custom_data), 1);
+        // Note that the key here is used the array offset as in the case of
+        // receiving an existing translation custom data will not get updated
+        // either and the old value is sent.
+        $key = array_slice(tmgmt_ensure_keys_array($key), 1);
         $this->saveTranslation($job, $key, $response_job);
+
+        // Create mapping record for gengo job.
+        $mapping = array(
+          'tjid' => $job->tjid,
+          'gjid' => $response_job->job_id,
+          'data_item_key' => tmgmt_ensure_keys_string($key),
+        );
+        drupal_write_record('tmgmt_mygengo_mappings', $mapping);
       }
 
       $job->submitted(t('Job has been submitted.'));
@@ -410,7 +435,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         continue;
       }
 
-      $translations['job' . $job->tjid . $key] = array(
+      $translations[$job->tjid . '][' . $key] = array(
         'type' => 'text',
         'slug' => tmgmt_data_item_label($value),
         'body_src' => $value['#text'],

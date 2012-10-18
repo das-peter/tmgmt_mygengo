@@ -130,8 +130,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $data = variable_get('tmgmt_mygengo_test_last_gengo_response', FALSE);
     // Find the key under which we can access the job received:
     $jobs = $data->jobs;
-    $key = array_shift(array_keys(array_shift($jobs)));
-    $this->assertEqual($data->jobs[0][$key]->slug, $item->data['wrapper']['#label']);
+    $key = array_shift(array_keys($jobs));
+    $this->assertEqual($data->jobs[$key]->slug, $item->data['wrapper']['#label']);
 
     // Now it should be needs review.
     foreach ($job->getItems() as $item) {
@@ -182,16 +182,10 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // Verify generated labels/slugs.
     $this->refreshVariables();
     $data = variable_get('tmgmt_mygengo_test_last_gengo_response', FALSE);
-    $jobs = array();
+    $jobs = $data->jobs;
 
-    // Process response data so that we can do tests for slug.
-    foreach ($data->jobs as $job_item) {
-      $key = array_shift(array_keys($job_item));
-      $jobs[$key] = array_shift($job_item);
-    }
-
-    $subwrapper1_key = 'job' . $job->tjid . $item->tjiid . '][wrapper][subwrapper1';
-    $no_label_key = 'job' . $job->tjid . $item->tjiid . '][no_label';
+    $subwrapper1_key = $job->tjid . '][' . $item->tjiid . '][wrapper][subwrapper1';
+    $no_label_key = $job->tjid . '][' . $item->tjiid . '][no_label';
     $this->assertEqual($jobs[$subwrapper1_key]->slug, 'Parent label > Sub label 1');
     $this->assertEqual($jobs[$no_label_key]->slug, 'No label');
   }
