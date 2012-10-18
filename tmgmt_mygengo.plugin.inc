@@ -215,10 +215,15 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     // Get only the first error as we cannot effectively handle multiple error
     // states. It is highly probable that the error would have been the same
     // anyway.
-    $gengo_err = reset($results->err);
-    $gengo_err = array_shift($gengo_err);
+    if (is_array($results->err)) {
+      $gengo_err = reset($results->err);
+      $gengo_err = array_shift($gengo_err);
+    }
+    else {
+      $gengo_err = $results->err;
+    }
 
-    throw new TMGMTException('MyGengo service returned following error: <strong>@error</strong>', array('@error' => $gengo_err->msg), $gengo_err->code);
+    throw new TMGMTException('<strong>#@code @error</strong>', array('@error' => $gengo_err->msg, '@code' => $gengo_err->code));
   }
 
   /**
@@ -449,14 +454,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       );
 
       if (!empty($this->serviceComment)) {
-        $translations['job' . $job->tjid . $key]['comment'] = $this->serviceComment;
+        $translations[$job->tjid . '][' . $key]['comment'] = $this->serviceComment;
       }
       // If singleDataItemKey is set and we have reached this point we are going
       // to resubmit an existing data item as a new gengo job item. Therefore
       // we need to set force flag to create a new gengo job and not to get
       // existing translation.
       if (!empty($this->singleDataItemKey)) {
-        $translations['job' . $job->tjid . $key]['force'] = 1;
+        $translations[$job->tjid . '][' . $key]['force'] = 1;
       }
     }
 
