@@ -1,0 +1,49 @@
+<?php
+
+/**
+ * @file
+ * Install file for tmgmt_mygengo.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function tmgmt_mygengo_schema() {
+  $schema['tmgmt_mygengo_mappings'] = array(
+    'description' => 'Mapping table for remote gengo jobs to tmgmt jobs.',
+    'fields' => array(
+      'tjid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => '{tmgmt_job}.tjid foreign key',
+      ),
+      'gjid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Gengo job id',
+      ),
+      'data_item_key' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Translation job data item key.',
+      ),
+    ),
+    'indexes' => array(
+      'tjid' => array('tjid'),
+      'data_item_key' => array('data_item_key'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Creates tmgmt_mygengo_mapping table.
+ */
+function tmgmt_mygengo_update_7001() {
+  drupal_install_schema('tmgmt_mygengo');
+}
