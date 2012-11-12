@@ -250,42 +250,19 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         $this->setServiceComment($job->settings['comment']);
       }
 
-      foreach ($this->gengoSendJob($job) as $key => $response_job) {
+      $response = $this->gengoSendJob($job);
 
-        // Duplicate content has been submitted.
-        if (isset($response_job->duplicate)) {
-          // TODO - we need to handle duplicates in some way as client will not
-          // receive translation for this item.
-          continue;
-        }
+      if ($this->debug) {
+        watchdog('tmgmt_mygengo', 'Job submitted. Received response: @response',
+          array('@response' => var_export($response, TRUE)), WATCHDOG_DEBUG);
+      }
 
-        if ($this->debug) {
-          watchdog('tmgmt_mygengo', 'Job submitted. Received response job @response',
-            array('@response' => var_export($response_job, TRUE)), WATCHDOG_DEBUG);
-        }
-
-        // For machine translations the job is not wrapped in another object
-        // however for human translations it is. So try to cope with this
-        // gengo system variety.
-        if (!isset($response_job->custom_data)) {
-          $response_job = reset($response_job);
-        }
-
-        // We might already get translated data, so run translation save
-        // to capture it.
-        // Note that the key here is used the array offset as in the case of
-        // receiving an existing translation custom data will not get updated
-        // either and the old value is sent.
-        $key = array_slice(tmgmt_ensure_keys_array($key), 1);
-        $this->saveTranslation($job, $key, $response_job);
-
-        // Create mapping record for gengo job.
-        $mapping = array(
-          'tjid' => $job->tjid,
-          'gjid' => $response_job->job_id,
-          'data_item_key' => tmgmt_ensure_keys_string($key),
-        );
-        drupal_write_record('tmgmt_mygengo_mappings', $mapping);
+      // If we already receive jobs, process them.
+      if (!empty($response->jobs)) {
+        $this->processGengoJobsUponTranslationRequest($job, $response->jobs);
+      }
+      elseif(isset($response->order_id)) {
+        $this->initGengoMapping($job, $response->order_id);
       }
 
       $job->submitted(t('Job has been submitted.'));
@@ -295,6 +272,50 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       $job->rejected('Job has been rejected with following error: !error',
         array('!error' => $e->getMessage()), 'error');
     }
+  }
+
+  protected function processGengoJobsUponTranslationRequest(TMGMTJob $job, $response_jobs) {
+
+    $mappings = array();
+
+    foreach ($response_jobs as $key => $response_job) {
+
+      // Duplicate content has been submitted.
+      if (isset($response_job->duplicate)) {
+        // TODO - we need to handle duplicates in some way as client will not
+        // receive translation for this item.
+        continue;
+      }
+
+      // For machine translations the job is not wrapped in another object
+      // however for human translations it is. So try to cope with this
+      // gengo system variety.
+      if (!isset($response_job->custom_data)) {
+        $response_job = reset($response_job);
+      }
+
+      // In case we receive an existing translation the array offset IS also
+      // the data kay, and we ought to use it as the object custom data is not
+      // updated. However this is not always the case and in some case we
+      // receive numeric keys, so try to set some custom data to increase the
+      // chance of matching the job.
+      if (is_numeric($key)) {
+        $key = $response_job->custom_data;
+      }
+
+      $key = array_slice(tmgmt_ensure_keys_array($key), 1);
+      $this->saveTranslation($job, $key, $response_job);
+
+      $mappings[] = array(
+        'tjid' => $job->tjid,
+        'gjid' => 'job_id',
+        'data_item_key' => $key,
+      );
+    }
+
+    // For jobs received upon submission we create gengo mappings differently
+    // than in case of regular translation cycle.
+    $this->saveGengoMappings($mappings);
   }
 
   /**
@@ -421,8 +442,9 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    *
    * @param TMGMTJob $job
    *
-   * @return array
-   *   Array of job objects returned from gengo.
+   * @return mixed
+   *   - Array of job objects returned from gengo.
+   *   - Status object with order info.
    */
   public function gengoSendJob(TMGMTJob $job) {
     $data = tmgmt_flatten_data($job->getData());
@@ -465,17 +487,11 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       }
     }
 
-    $response = $this->requestFromGengo($job->getTranslator(), 'translate/jobs', 'POST', array(
+    return $this->requestFromGengo($job->getTranslator(), 'translate/jobs', 'POST', array(
       'jobs' => $translations,
       // In case we send one job item as group we will get error from Gengo.
       'as_group' => (int) (count($translations) > 1),
     ));
-
-    if (isset($response->jobs)) {
-      return $response->jobs;
-    }
-
-    return array();
   }
 
   /**
@@ -492,5 +508,135 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     }
 
     return $drupal_code;
+  }
+
+  /**
+   * Saves mapping with tmgmt data item and gengo job.
+   *
+   * @param array $mappings
+   *   Array of associated mappings data to save in format:
+   *   - tjid - Translation job id
+   *   - gjid - Gengo translation job id
+   *   - key - Data item key
+   */
+  public function saveGengoMappings(array $mappings) {
+    foreach ($mappings as $mapping) {
+      $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m', array('tjid'));
+      $select->condition('tjid', $mapping['tjid']);
+      $select->condition('gjid', $mapping['gjid']);
+
+      if ($select->execute()->fetchField()) {
+        drupal_write_record('tmgmt_mygengo_mappings', $mapping, array('tjid', 'gjid'));
+      }
+      else {
+        drupal_write_record('tmgmt_mygengo_mappings', $mapping);
+      }
+    }
+  }
+
+  protected function initGengoMapping(TMGMTJob $job, $gorder_id) {
+    $data = array(
+      'tjid' => $job->tjid,
+      'gorder_id' => $gorder_id,
+    );
+    drupal_write_record('tmgmt_mygengo_mappings', $data);
+  }
+
+  public function mapGengoJobs(TMGMTJob $job) {
+
+    // Search for placeholder item.
+    $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m', array('gorder_id'));
+    $select->condition('tjid', $job->tjid);
+    $select->condition('gjid', '');
+
+    // If we have a placeholder we want to fetch gengo job ids.
+    if ($gorder_id = $select->execute()->fetchField()) {
+      $request = $this->requestFromGengo($job->getTranslator(), 'translate/order/' . $gorder_id, 'GET');
+
+      if ($this->debug) {
+        watchdog('tmgmt_mygengo', 'Fetching order info. Received response: @response',
+          array('@response' => var_export($request, TRUE)), WATCHDOG_DEBUG);
+      }
+
+      $gengo_job_ids = array();
+      if (!empty($request->order->jobs_pending)) {
+        $gengo_job_ids += $request->order->jobs_pending;
+      }
+      if (!empty($request->order->jobs_available)) {
+        $gengo_job_ids += $request->order->jobs_available;
+      }
+      if (!empty($request->order->jobs_reviewable)) {
+        $gengo_job_ids += $request->order->jobs_reviewable;
+      }
+
+      // If we have job ids, remove the placeholder record and insert actual
+      // gengo job ids.
+      if (!empty($gengo_job_ids)) {
+        db_delete('tmgmt_mygengo_mappings')->condition('gorder_id', $gorder_id)->execute();
+
+        $mappings = array();
+
+        foreach ($gengo_job_ids as $gengo_job_id) {
+          $mappings[] = array(
+            'tjid' => $job->tjid,
+            'gjid' => $gengo_job_id,
+            'gorder_id' => $gorder_id,
+          );
+        }
+
+        $this->saveGengoMappings($mappings);
+      }
+    }
+
+    // Now load all unmapped gengo job ids and try to get mapping data.
+    $unmapped_gjids = $this->getUnmappedGengoJobIds($job->tjid);
+    $response = NULL;
+
+    // We have unmapped gengo job ids, try to fetch mapping data.
+    if (!empty($unmapped_gjids)) {
+      $response = $this->requestFromGengo($job->getTranslator(),
+          'translate/jobs/' . implode(',', $unmapped_gjids), 'GET');
+    }
+
+    if ($this->debug) {
+      watchdog('tmgmt_mygengo', 'Mapping gengo jobs. tjid: @tjid gjids: @gjids. Received response: @response',
+        array(
+          '@tjid' => $job->tjid,
+          '@gjids' => implode(', ', $unmapped_gjids),
+          '@response' => var_export($response, TRUE)
+        ), WATCHDOG_DEBUG);
+    }
+
+    // Gengo did not provide any mapping data, do nothing.
+    if (empty($response->jobs)) {
+      return;
+    }
+
+    $mappings = array();
+    foreach ($response->jobs as $response_job) {
+      $mappings[] = array(
+        'tjid' => $job->tjid,
+        'gjid' => $response_job->job_id,
+        'data_item_key' => $response_job->custom_data,
+      );
+    }
+
+    $this->saveGengoMappings($mappings);
+  }
+
+  public function getUnmappedGengoJobIds($tjid) {
+    $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m', array('gjid'));
+    $select->condition('tjid', $tjid);
+    $select->condition('data_item_key', '');
+
+    return $select->execute()->fetchCol();
+  }
+
+  public function getMappedGengoData($tjid) {
+    $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m');
+    $select->condition('tjid', $tjid);
+    $select->condition('data_item_key', '', '!=');
+
+    return $select->execute()->fetchAllAssoc('gjid');
   }
 }

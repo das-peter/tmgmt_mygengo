@@ -24,6 +24,12 @@ function tmgmt_mygengo_schema() {
         'default' => 0,
         'description' => 'Gengo job id',
       ),
+      'gorder_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Gengo order id',
+      ),
       'data_item_key' => array(
         'type' => 'varchar',
         'length' => 255,
@@ -46,4 +52,15 @@ function tmgmt_mygengo_schema() {
  */
 function tmgmt_mygengo_update_7001() {
   drupal_install_schema('tmgmt_mygengo');
+}
+
+/**
+ * Adds Gengo order id field into mapping table.
+ */
+function tmgmt_mygengo_update_7002() {
+  $schema = tmgmt_mygengo_schema();
+
+  if (!db_field_exists('tmgmt_mygengo_mappings', 'gorder_id')) {
+    db_add_field('tmgmt_mygengo_mappings', 'gorder_id', $schema['tmgmt_mygengo_mappings']['fields']['gorder_id']);
+  }
 }

@@ -69,31 +69,26 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
    * @var TMGMTJob $job
    */
   $job = $form_state['tmgmt_job'];
-
-  $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m');
-  $select->condition('tjid', $job->tjid);
-
-  $result = $select->execute()->fetchAll();
-
-  if (empty($result)) {
-    drupal_set_message(t('No myGengo mapping records found for this translation jobs.'), 'error');
-    return;
-  }
-
-  $gengo_mappings = array();
-  foreach ($result as $row) {
-    $gengo_mappings[$row->gjid] = $row->data_item_key;
-  }
-
   /**
    * @var TMGMTMyGengoTranslatorPluginController $controller
    */
   $controller = $job->getTranslator()->getController();
-  $response = $controller->requestFromGengo($job->getTranslator(), 'translate/jobs/' . implode(',', array_keys($gengo_mappings)), 'GET');
+
+  // Try to map jobs that have not yet been mapped.
+  $controller->mapGengoJobs($job);
+
+  // Get all available mappings.
+  $gengo_mappings = $controller->getMappedGengoData($job->tjid);
+
+  $response = NULL;
+  // Get Translations for mapped data.
+  if (!empty($gengo_mappings)) {
+    $response = $controller->requestFromGengo($job->getTranslator(), 'translate/jobs/' . implode(',', array_keys($gengo_mappings)), 'GET');
+  }
 
   if (!empty($response->jobs)) {
     foreach ($response->jobs as $response_job) {
-      $controller->saveTranslation($job, $gengo_mappings[$response_job->job_id], $response_job);
+      $controller->saveTranslation($job, $gengo_mappings[$response_job->job_id]->data_item_key, $response_job);
     }
 
     drupal_set_message(t('All available translations from myGengo have been polled.'));
@@ -115,9 +110,15 @@ function tmgmt_mygengo_callback() {
   $tjid = array_shift($keys);
 
   $job = tmgmt_job_load($tjid);
+
+  /**
+   * @var TMGMTMyGengoTranslatorPluginController $mygengo
+   */
   $mygengo = $job->getTranslator()->getController();
   $mygengo->saveTranslation($job, $keys, $data);
-  echo '';
+  $mygengo->mapGengoJobs($job);
+
+  print '';
 }
 
 /**
