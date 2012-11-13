@@ -324,11 +324,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Receives and stores a translation returned by myGengo.
    */
   public function saveTranslation(TMGMTJob $job, $keys, $data) {
-    // Try to add translation for both statuses - approved and available.
-    // In case a translation is not new or not in state pending the
-    // translation will not be updated anyway. This is handled in
-    // TMGMTJobItem::addTranslatedDataRecursive().
-    if ($data->status == 'approved' || $data->status == 'available') {
+    if ($data->status == 'approved') {
       $keys = tmgmt_ensure_keys_array($keys);
       $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
     }
