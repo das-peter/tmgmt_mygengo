@@ -308,8 +308,10 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
       $mappings[] = array(
         'tjid' => $job->tjid,
-        'gjid' => 'job_id',
-        'data_item_key' => $key,
+        // Yes, this is not a joke, they really return string value "NULL" in
+        // case of a machine translation.
+        'gjid' => $response_job->job_id == 'NULL' ? 0 : $response_job->job_id,
+        'data_item_key' => tmgmt_ensure_keys_string($key),
       );
     }
 
