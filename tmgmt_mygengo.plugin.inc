@@ -532,6 +532,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     }
   }
 
+  /**
+   * Creates a placeholder record in the mapping table.
+   *
+   * The idea here is not to introduce additional storage to temporarily store
+   * gegngo order id before we get gengo job ids.
+   *
+   * @param TMGMTJob $job
+   * @param int $gorder_id
+   *   Gengo job id.
+   */
   protected function initGengoMapping(TMGMTJob $job, $gorder_id) {
     $data = array(
       'tjid' => $job->tjid,
@@ -540,6 +550,11 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     drupal_write_record('tmgmt_mygengo_mappings', $data);
   }
 
+  /**
+   * Maps TMGMT job data items to gengo jobs.
+   *
+   * @param TMGMTJob $job
+   */
   public function mapGengoJobs(TMGMTJob $job) {
 
     // Search for placeholder item.
@@ -556,80 +571,114 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
           array('@response' => var_export($request, TRUE)), WATCHDOG_DEBUG);
       }
 
-      $gengo_job_ids = array();
-      if (!empty($request->order->jobs_pending)) {
-        $gengo_job_ids += $request->order->jobs_pending;
+      // If all the jobs are not yet in Gengo's system, do nothing.
+      if($request->order->jobs_queued != 0){
+        return;
       }
+
+      $gengo_job_ids = array();
       if (!empty($request->order->jobs_available)) {
         $gengo_job_ids += $request->order->jobs_available;
+      }
+      if (!empty($request->order->jobs_pending)) {
+        $gengo_job_ids += $request->order->jobs_pending;
       }
       if (!empty($request->order->jobs_reviewable)) {
         $gengo_job_ids += $request->order->jobs_reviewable;
       }
-
-      // If we have job ids, remove the placeholder record and insert actual
-      // gengo job ids.
-      if (!empty($gengo_job_ids)) {
-        db_delete('tmgmt_mygengo_mappings')->condition('gorder_id', $gorder_id)->execute();
-
-        $mappings = array();
-
-        foreach ($gengo_job_ids as $gengo_job_id) {
-          $mappings[] = array(
-            'tjid' => $job->tjid,
-            'gjid' => $gengo_job_id,
-            'gorder_id' => $gorder_id,
-          );
-        }
-
-        $this->saveGengoMappings($mappings);
+      if (!empty($request->order->jobs_approved)) {
+        $gengo_job_ids += $request->order->jobs_approved;
       }
+
+      // Remove the placeholder record and insert actual
+      db_delete('tmgmt_mygengo_mappings')->condition('gorder_id', $gorder_id)->execute();
+
+      $mappings = array();
+      foreach ($gengo_job_ids as $gengo_job_id) {
+        $mappings[] = array(
+          'tjid' => $job->tjid,
+          'gjid' => $gengo_job_id,
+          'gorder_id' => $gorder_id,
+        );
+      }
+      // Add intial records into the table
+      $this->saveGengoMappings($mappings);
     }
 
-    // Now load all unmapped gengo job ids and try to get mapping data.
-    $unmapped_gjids = $this->getUnmappedGengoJobIds($job->tjid);
+    // Now load all Gengo job ids and try to get mapping data.
+    $gjids = $this->getGengoJobIds($job->tjid);
     $response = NULL;
 
-    // We have unmapped gengo job ids, try to fetch mapping data.
-    if (!empty($unmapped_gjids)) {
-      $response = $this->requestFromGengo($job->getTranslator(),
-          'translate/jobs/' . implode(',', $unmapped_gjids), 'GET');
-    }
+    // We have fetch mapping data.
+    $response = $this->requestFromGengo($job->getTranslator(),
+        'translate/jobs/' . implode(',', $gjids), 'GET');
 
     if ($this->debug) {
       watchdog('tmgmt_mygengo', 'Mapping gengo jobs. tjid: @tjid gjids: @gjids. Received response: @response',
         array(
           '@tjid' => $job->tjid,
-          '@gjids' => implode(', ', $unmapped_gjids),
+          '@gjids' => implode(', ', $gjids),
           '@response' => var_export($response, TRUE)
         ), WATCHDOG_DEBUG);
     }
 
     // Gengo did not provide any mapping data, do nothing.
+    // This only happens in the case that Gengo is unreachable.
     if (empty($response->jobs)) {
+
+      if ($this->debug) {
+        watchdog('tmgmt_mygengo', 'Mapping gengo jobs. tjid: @tjid gjids: @gjids. Received response: @response',
+          array(
+            '@tjid' => $job->tjid,
+            '@gjids' => implode(', ', $gjids),
+            '@response' => var_export($response, TRUE)
+          ), WATCHDOG_DEBUG);
+      }
       return;
     }
 
+    // update mappings and save any translations
     $mappings = array();
-    foreach ($response->jobs as $response_job) {
+    foreach ($response->jobs as $key => $response_job) {
       $mappings[] = array(
         'tjid' => $job->tjid,
         'gjid' => $response_job->job_id,
         'data_item_key' => $response_job->custom_data,
       );
-    }
 
+      if (is_numeric($key)) {
+        $key = $response_job->custom_data;
+      }
+      $key = array_slice(tmgmt_ensure_keys_array($key), 1);
+      $this->saveTranslation($job, $key, $response_job);
+    }
+    // Update mapping records
     $this->saveGengoMappings($mappings);
   }
 
-  public function getUnmappedGengoJobIds($tjid) {
+  /**
+   * Gets gengo job ids for a tmgmt job.
+   *
+   * @param int $tjid
+   *   TMGMT Job id.
+   *
+   * @return array
+   *   Array of gengo job ids.
+   */
+  public function getGengoJobIds($tjid) {
     $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m', array('gjid'));
     $select->condition('tjid', $tjid);
-    $select->condition('data_item_key', '');
 
     return $select->execute()->fetchCol();
   }
 
+  /**
+   * Gets gengo mappings not being mapped to local data items.
+   *
+   * @param int $tjid
+   * @return array
+   *   Array of mapping records keyd by gengo job ids.
+   */
   public function getMappedGengoData($tjid) {
     $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m');
     $select->condition('tjid', $tjid);
