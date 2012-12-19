@@ -70,35 +70,54 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
      */
     $plugin = tmgmt_translator_plugin_controller($this->pluginType);
 
-    if (empty($job->settings['quality'])) {
-      $job->settings['quality'] = !empty($form_state['values']['settings']['quality']) ? $form_state['values']['settings']['quality'] : 'standard';
+    // Set the quality setting from submitted vals - we need this for quote as
+    // repetitive change of Quality select will not update the job settings.
+    if (isset($form_state['values']['settings']['quality'])) {
+      $job->settings['quality'] = $form_state['values']['settings']['quality'];
     }
 
-    $sum_unit_count = $job->getWordCount();
-    $sum_credits = $sum_unit_count * $plugin
-        ->getUnitPrice($job->getTranslator(), $job->source_language, $job->target_language, $job->settings['quality']);
+    // In case quality has not been set yet, init it to default.
+    if (empty($job->settings['quality'])) {
+      $job->settings['quality'] = 'standard';
+    }
 
-    $settings['word_count'] = array(
-      '#type' => 'item',
-      '#title' => t('Word count'),
-      '#markup' => $sum_unit_count,
+    $tier_names = array(
+      'nonprofit' => t('Machine'),
+      'standard' => t('Standard'),
+      'pro' => t('Business'),
+      'ultra' => t('Ultra'),
     );
+    $options = array();
+    $gengo_language_pairs = $plugin->getGengoLanguagePairs($job->getTranslator(), $job->source_language, $job->target_language);
+
+    // Build quality options based on returned language pairs data. This
+    // approach will filter out tiers that are not supported for current
+    // source/target lang pair.
+    foreach ($gengo_language_pairs as $tier) {
+      $options[$tier->tier] = t('@tier (@cost @currency per word)', array(
+        '@tier' => $tier_names[$tier->tier],
+        '@cost' => number_format($tier->unit_price, 2),
+        '@currency' => $tier->currency,
+      ));
+    }
+
+    $quote = array();
+
+    try {
+      $quote = $plugin->getQuote($job);
+    }
+    catch (TMGMTException $e) {
+      $err_msg = $e->getMessage();
+    }
+
     $settings['quality'] = array(
       '#type' => 'select',
       '#title' => t('Quality'),
-      '#options' => array(
-        'machine' => t('Machine'),
-        'standard' => t('Standard'),
-        'pro' => t('Pro'),
-
-        // We are waiting till gengo service will support ultra translations
-        // for grouped jobs.
-        // 'ultra' => t('Ultra'),
-      ),
+      '#options' => $options,
       '#default_value' => $job->settings['quality'],
       '#description' => t('With which Quality you want to translate?'),
       '#ajax' => array(
-        'callback' => 'tmgmt_ui_ajax_callback_translator_select',
+        'callback' => 'tmgmt_mygengo_ajax_callback_translator_select',
         'wrapper' => 'tmgmt-ui-translator-settings',
       ),
     );
@@ -106,22 +125,29 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#type' => 'fieldset',
       '#title' => t('Quote'),
     );
+
     if (!empty($err_msg)) {
       $settings['quote']['error_msg'] = array(
         '#markup' => '<div class="messages error">' . $err_msg . '</div>'
       );
     }
-    $settings['quote']['needed_credits'] = array(
-      '#type' => 'item',
-      '#title' => t('Needed Credits'),
-      '#markup' => $sum_credits,
-    );
-    // We are not able to retrieve this info without submitting the job.
-//    $settings['quote']['eta'] = array(
-//      '#type' => 'item',
-//      '#title' => t('ETA'),
-//      '#markup' => format_date(mktime() + $highest_eta, "long"),
-//    );
+    else {
+      $settings['quote']['word_count'] = array(
+        '#type' => 'item',
+        '#title' => t('Word count'),
+        '#markup' => isset($quote['sum_word_count']) ? $quote['sum_word_count'] : t('unknown'),
+      );
+      $settings['quote']['needed_credits'] = array(
+        '#type' => 'item',
+        '#title' => t('Needed Credits'),
+        '#markup' => number_format($quote['sum_credits'], 2) . ' ' . $quote['currency'],
+      );
+      $settings['quote']['eta'] = array(
+        '#type' => 'item',
+        '#title' => t('ETA'),
+        '#markup' => format_date(time() + $quote['highest_eta'], "long"),
+      );
+    }
 
     $settings['comment'] = array(
       '#type' => 'textarea',

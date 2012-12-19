@@ -10,7 +10,7 @@
  */
 class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController implements TMGMTTranslatorRejectDataItem {
 
-  public $debug = TRUE;
+  public $debug = FALSE;
 
   /**
    * Translation service URL.
@@ -62,7 +62,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     'zh-hans' => 'zh',
   );
 
-  protected $language_pairs;
+  protected $gengoLanguagePairs = array();
 
 
   /**
@@ -331,64 +331,99 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Implements TMGMTTranslatorPluginControllerInterface::getSupportedTargetLanguages().
+   * Gets gengo language pairs.
+   *
+   * @param TMGMTTranslator $translator
+   * @param $source_language
+   * @param $target_language
+   *
+   * @return array
    */
-  public function getSupportedTargetLanguages(TMGMTTranslator $translator, $source_language) {
-    $results = array();
-
+  public function getGengoLanguagePairs(TMGMTTranslator $translator, $source_language, $target_language = NULL) {
     try {
-      $this->language_pairs = $this->requestFromGengo($translator, 'translate/service/language_pairs',
-        'GET', array('lc_src' => $this->mapToGengoLangCode($source_language)));
-
-      foreach ($this->language_pairs as $target) {
-        $results[$target->lc_tgt] = $target->lc_tgt;
+      if (empty($this->gengoLanguagePairs)) {
+        $this->gengoLanguagePairs = $this->requestFromGengo($translator, 'translate/service/language_pairs',
+          'GET', array('lc_src' => $this->mapToGengoLangCode($source_language)));
       }
     }
     catch (TMGMTException $e) {
       watchdog_exception('tmgmt', $e);
     }
 
+    // If target language provided, filter out all other langs.
+    if (!empty($target_language)) {
+      $lang_pairs = array();
+
+      foreach ($this->gengoLanguagePairs as $lang_pair) {
+        if ($lang_pair->lc_tgt == $target_language) {
+          $lang_pairs[] = $lang_pair;
+        }
+      }
+
+      return $lang_pairs;
+    }
+
+    return $this->gengoLanguagePairs;
+  }
+
+  /**
+   * Implements TMGMTTranslatorPluginControllerInterface::getSupportedTargetLanguages().
+   */
+  public function getSupportedTargetLanguages(TMGMTTranslator $translator, $source_language) {
+    $results = array();
+
+    foreach ($this->getGengoLanguagePairs($translator, $source_language) as $target) {
+      $results[$target->lc_tgt] = $target->lc_tgt;
+    }
+
     return $results;
   }
 
   /**
-   * Helper method to get unit price for source/target languages and tier.
+   * Get a quote from Gengo for the given job.
    *
-   * @param TMGMTTranslator $translator
-   * @param $source_language
-   * @param $target_language
-   * @param $tier
+   * @param TMGMTJob $job
    *
-   * @return mixed
-   *   In case of success a double value.
-   *   In case of failure a boolean FALSE.
+   * @return array
+   *   Array with the following keys: currency, estimates, highest_eta,
+   *   sum_credits, sum_eta, sum_word_count, and unit_price.
+   * @throws TMGMTException
+   *   In case of error doing request to gengo service.
    */
-  public function getUnitPrice(TMGMTTranslator $translator, $source_language, $target_language, $tier) {
+  public function getQuote(TMGMTJob $job) {
+    $response = $this->gengoSendJob($job, TRUE);
 
-    // Send request only in case we did not call getSupportedTargetLanguages()
-    // prior to calling this method.
-    if (empty($this->language_pairs)) {
-      try {
-        $this->language_pairs = $this->requestFromGengo($translator, 'translate/service/language_pairs',
-          'GET', array('lc_src' => $this->mapToGengoLangCode($source_language)));
-      }
-      catch (TMGMTException $e) {
-        watchdog_exception('tmgmt', $e);
-        return FALSE;
+    if ($this->debug) {
+      watchdog('tmgmt_mygengo', 'Job Quote submitted. Received response: @response',
+        array('@response' => var_export($response, TRUE)), WATCHDOG_DEBUG);
+    }
+
+    // Setup empty values
+    $quote = array(
+      'currency' => '',
+      'estimated' => FALSE,
+      'highest_eta' => 0,
+      'sum_credits' => 0,
+      'sum_word_count' => 0,
+    );
+
+    if (!empty($response->jobs)) {
+      $jobs = (array) $response->jobs;
+
+      $quote['currency'] = reset($jobs)->currency;
+
+      // Sum up quotes from each job.
+      foreach ($response->jobs as $job) {
+        $quote['sum_word_count'] += $job->unit_count;
+        $quote['sum_credits'] += $job->credits;
+
+        if ($job->eta > $quote['highest_eta']) {
+          $quote['highest_eta'] = $job->eta;
+        }
       }
     }
 
-    foreach ($this->language_pairs as $target) {
-      if (
-        $target->lc_tgt == $this->mapToGengoLangCode($target_language) &&
-        $target->lc_src == $this->mapToGengoLangCode($source_language) &&
-        $target->tier == $tier
-      ) {
-        return $target->unit_price;
-      }
-    }
-
-    return FALSE;
+    return $quote;
   }
 
   /**
@@ -439,12 +474,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Will build and send a job to gengo service.
    *
    * @param TMGMTJob $job
+   * @param boolean $quote_only
+   *   (Optional) Set to TRUE to only get a quote for the given job.
    *
    * @return mixed
    *   - Array of job objects returned from gengo.
    *   - Status object with order info.
    */
-  public function gengoSendJob(TMGMTJob $job) {
+  public function gengoSendJob(TMGMTJob $job, $quote_only = FALSE) {
     $data = tmgmt_flatten_data($job->getData());
 
     $translations = array();
@@ -485,7 +522,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       }
     }
 
-    return $this->requestFromGengo($job->getTranslator(), 'translate/jobs', 'POST', array(
+    $url = $quote_only ? 'translate/service/quote' : 'translate/jobs';
+    return $this->requestFromGengo($job->getTranslator(), $url, 'POST', array(
       'jobs' => $translations,
       // In case we send one job item as group we will get error from Gengo.
       'as_group' => (int) (count($translations) > 1),
