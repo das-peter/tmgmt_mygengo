@@ -70,7 +70,9 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
      */
     $plugin = tmgmt_translator_plugin_controller($this->pluginType);
 
-    $job->settings['quality'] = !empty($form_state['values']['settings']['quality']) ? $form_state['values']['settings']['quality'] : 'standard';
+    if (empty($job->settings['quality'])) {
+      $job->settings['quality'] = !empty($form_state['values']['settings']['quality']) ? $form_state['values']['settings']['quality'] : 'standard';
+    }
 
     $sum_unit_count = $job->getWordCount();
     $sum_credits = $sum_unit_count * $plugin
@@ -125,6 +127,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#type' => 'textarea',
       '#title' => t('Instructions'),
       '#description' => t('You can provide a set of instructions so that the translator will better understand your requirements.'),
+      '#default_value' => !empty($job->settings['quality']) ? $job->settings['comment'] : NULL,
     );
 
     return $settings;
