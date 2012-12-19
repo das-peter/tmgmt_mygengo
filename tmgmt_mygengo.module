@@ -51,7 +51,7 @@ function tmgmt_mygengo_form_tmgmt_job_form_alter(&$form, &$form_state) {
    */
   $job = $form_state['tmgmt_job'];
 
-  if (!empty($job) && $job->isActive()) {
+  if (!empty($job) && $job->isActive() && $job->getTranslator()->getController()->pluginType() == 'mygengo') {
     $form['actions']['poll'] = array(
       '#type' => 'submit',
       '#value' => t('Poll translations'),
@@ -160,5 +160,12 @@ function tmgmt_mygengo_tmgmt_translator_plugin_info() {
  * Attaches javascript needed for gengo form.
  */
 function tmgmt_mygengo_form_tmgmt_translator_form_alter(&$form, &$form_state) {
-  $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo.toggle_auto_approve.js';
+  /**
+   * @var TMGMTTranslator $translator
+   */
+  $translator = $form_state['tmgmt_translator'];
+
+  if (!empty($translator) && $translator->plugin == 'mygengo') {
+    $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo.toggle_auto_approve.js';
+  }
 }
