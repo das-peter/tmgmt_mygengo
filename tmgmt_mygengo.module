@@ -169,12 +169,3 @@ function tmgmt_mygengo_form_tmgmt_translator_form_alter(&$form, &$form_state) {
     $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo.toggle_auto_approve.js';
   }
 }
-
-/**
- * Ajax callback to fetch the options provided by a translator.
- */
-function tmgmt_mygengo_ajax_callback_translator_select($form, &$form_state) {
-  watchdog('jo vole', var_export($form['translator_wrapper']['settings'], true));
-  $form_state['rebuild'] = TRUE;
-  return $form['translator_wrapper']['settings'];
-}

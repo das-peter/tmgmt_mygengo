@@ -81,13 +81,12 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       $job->settings['quality'] = 'standard';
     }
 
-    $tier_names = array(
+    $tier_names = $options = array(
       'nonprofit' => t('Machine'),
       'standard' => t('Standard'),
       'pro' => t('Business'),
       'ultra' => t('Ultra'),
     );
-    $options = array();
     $gengo_language_pairs = $plugin->getGengoLanguagePairs($job->getTranslator(), $job->source_language, $job->target_language);
 
     // Build quality options based on returned language pairs data. This
@@ -107,7 +106,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       $quote = $plugin->getQuote($job);
     }
     catch (TMGMTException $e) {
-      $err_msg = $e->getMessage();
+      $err_msg = t('Unable to get a quote from Gengo with error: !error', array('!error' => $e->getMessage()));
     }
 
     $settings['quality'] = array(
@@ -115,9 +114,9 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#title' => t('Quality'),
       '#options' => $options,
       '#default_value' => $job->settings['quality'],
-      '#description' => t('With which Quality you want to translate?'),
+      '#description' => t('Choose the level of quality for this translation job.'),
       '#ajax' => array(
-        'callback' => 'tmgmt_mygengo_ajax_callback_translator_select',
+        'callback' => 'tmgmt_ui_ajax_callback_translator_select',
         'wrapper' => 'tmgmt-ui-translator-settings',
       ),
     );
@@ -153,7 +152,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#type' => 'textarea',
       '#title' => t('Instructions'),
       '#description' => t('You can provide a set of instructions so that the translator will better understand your requirements.'),
-      '#default_value' => !empty($job->settings['quality']) ? $job->settings['comment'] : NULL,
+      '#default_value' => !empty($job->settings['comment']) ? $job->settings['comment'] : NULL,
     );
 
     return $settings;

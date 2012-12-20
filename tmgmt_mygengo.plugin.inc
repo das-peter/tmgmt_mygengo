@@ -211,16 +211,15 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       return $results->response;
     }
 
-    // If we get to this point it is definitely an error state.
-    // Get only the first error as we cannot effectively handle multiple error
-    // states. It is highly probable that the error would have been the same
-    // anyway.
-    if (is_array($results->err)) {
+    // Find if we have only one error or multiple.
+    if (isset($results->err->code)) {
+      $gengo_err = $results->err;
+    }
+    // In case of multiple, take only the first one - they are usually the same.
+    // TODO - handle multiple errors received from gengo.
+    else {
       $gengo_err = reset($results->err);
       $gengo_err = array_shift($gengo_err);
-    }
-    else {
-      $gengo_err = $results->err;
     }
 
     throw new TMGMTException('<strong>#@code @error</strong>', array('@error' => $gengo_err->msg, '@code' => $gengo_err->code));
