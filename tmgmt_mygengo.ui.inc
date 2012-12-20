@@ -23,6 +23,8 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
    */
   public function pluginSettingsForm($form, &$form_state, TMGMTTranslator $translator, $busy = FALSE) {
 
+    $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo.toggle_auto_approve.js';
+
     $form['api_public_key'] = array(
       '#type' => 'textfield',
       '#title' => t('myGengo API Public key'),
@@ -82,32 +84,26 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     }
 
     $tier_names = $options = array(
-      'nonprofit' => t('Machine'),
       'standard' => t('Standard'),
       'pro' => t('Business'),
       'ultra' => t('Ultra'),
     );
     $gengo_language_pairs = $plugin->getGengoLanguagePairs($job->getTranslator(), $job->source_language, $job->target_language);
+    $available_tiers = array();
 
     // Build quality options based on returned language pairs data. This
     // approach will filter out tiers that are not supported for current
     // source/target lang pair.
     foreach ($gengo_language_pairs as $tier) {
-      $options[$tier->tier] = t('@tier (@cost @currency per word)', array(
-        '@tier' => $tier_names[$tier->tier],
-        '@cost' => number_format($tier->unit_price, 2),
-        '@currency' => $tier->currency,
-      ));
+      $available_tiers[$tier->tier] = $options[$tier->tier] =
+        t('@tier (@cost @currency per word)', array(
+          '@tier' => $tier_names[$tier->tier],
+          '@cost' => number_format($tier->unit_price, 2),
+          '@currency' => $tier->currency,
+        ));
     }
-
-    $quote = array();
-
-    try {
-      $quote = $plugin->getQuote($job);
-    }
-    catch (TMGMTException $e) {
-      $err_msg = t('Unable to get a quote from Gengo with error: !error', array('!error' => $e->getMessage()));
-    }
+    $options = array_intersect_key($available_tiers, $options);
+    $options = array_merge(array('machine' => t('Machine')), $options);
 
     $settings['quality'] = array(
       '#type' => 'select',
@@ -120,6 +116,20 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
         'wrapper' => 'tmgmt-ui-translator-settings',
       ),
     );
+
+    if ($job->settings['quality'] == 'nonprofit') {
+      return $settings;
+    }
+
+    $quote = array();
+
+    try {
+      $quote = $plugin->getQuote($job);
+    }
+    catch (TMGMTException $e) {
+      $err_msg = t('Unable to get a quote from Gengo with error: !error', array('!error' => $e->getMessage()));
+    }
+
     $settings['quote'] = array(
       '#type' => 'fieldset',
       '#title' => t('Quote'),
