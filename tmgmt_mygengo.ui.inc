@@ -86,7 +86,10 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     $tier_names = $options = array(
       'standard' => t('Standard'),
       'pro' => t('Business'),
-      'ultra' => t('Ultra'),
+      // Gengo service does not support ultra quality for grouped jobs and we
+      // send all jobs as grouped. We need to wait until gengo will support
+      // grouped jobs for ultra quality as well.
+      //'ultra' => t('Ultra'),
     );
     $gengo_language_pairs = $plugin->getGengoLanguagePairs($job->getTranslator(), $job->source_language, $job->target_language);
     $available_tiers = array();
@@ -117,7 +120,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       ),
     );
 
-    if ($job->settings['quality'] == 'nonprofit') {
+    if ($job->settings['quality'] == 'machine') {
       return $settings;
     }
 
