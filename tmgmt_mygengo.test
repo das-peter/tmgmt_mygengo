@@ -218,13 +218,13 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     $job->requestTranslation();
 
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review');
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
 
     // Make sure we got the review tool with source and translation texts.
     $this->assertText('Hello world');
     $this->assertText('mt_de_Hello world');
 
-    $this->drupalPost('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review', array(), '✗');
+    $this->drupalPost('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), '✗');
 
     $item_wrapper_key = 'wrapper][subwrapper';
     // Test if we have correct confirm text.
@@ -239,7 +239,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertText($item->defaultLabel());
 
     // Navigate to the review tool and check if the data item is pending.
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review');
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
     $state_icon = array_shift($this->xpath('//tr[@id="tmgmt-ui-element-wrapper-subwrapper"]/td[1]/div[@class="tmgmt-ui-state"]'));
     $this->assertEqual($state_icon->div['title'], t('Pending'));
 
@@ -262,7 +262,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertTrue(empty($out));
 
     // See if we have source and translation texts populated correctly.
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid . '/review');
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
     $this->assertText('Hello world');
     $this->assertText('Hallo Welt reviewed');
   }
