@@ -7,7 +7,7 @@
 
 /**
  * @file
- * Provides myGengo translation plugin controller.
+ * Provides Gengo translation plugin controller.
  */
 class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIController {
 
@@ -27,21 +27,21 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
 
     $form['api_public_key'] = array(
       '#type' => 'textfield',
-      '#title' => t('myGengo API Public key'),
+      '#title' => t('Gengo API Public key'),
       '#default_value' => $translator->getSetting('api_public_key'),
-      '#description' => t('Please enter yout myGengo API Public key.'),
+      '#description' => t('Please enter your Gengo API Public key.'),
     );
     $form['api_private_key'] = array(
       '#type' => 'textfield',
-      '#title' => t('myGengo API Private key'),
+      '#title' => t('Gengo API Private key'),
       '#default_value' => $translator->getSetting('api_private_key'),
-      '#description' => t('Please enter your myGengo API Private key.'),
+      '#description' => t('Please enter your Gengo API Private key.'),
     );
     $form['mygengo_auto_approve'] = array(
       '#type' => 'checkbox',
       '#title' => t('Auto approve'),
       '#default_value' => $translator->getSetting('mygengo_auto_approve'),
-      '#description' => t('Check to auto approve translated jobs from myGengo. If this setting is off there is a review process available, however each rejection will result in submission of a new job to myGengo service and therefore additional costs.'),
+      '#description' => t('Check to auto approve translated jobs from Gengo. If this setting is off there is a review process available, however each rejection will result in submission of a new job to Gengo service and therefore additional costs.'),
       '#prefix' => '<div class="mygengo-auto-approve">',
       '#suffix' => '</div>',
     );
@@ -57,7 +57,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#type' => 'checkbox',
       '#title' => t('Use preferred translators'),
       '#default_value' => $translator->getSetting('use_preferred'),
-      '#description' => t('Check to use translators from the preferred translators list associated with your MyGengo account.'),
+      '#description' => t('Check to use translators from the preferred translators list associated with your Gengo account.'),
     );
 
     return parent::pluginSettingsForm($form, $form_state, $translator, $busy);

@@ -5,10 +5,10 @@
  * Module file of the translation management mygengo module.
  *
  * Credits:
- * Originally implemented by Ryan McGrath, myGengo. Reworked and added new
+ * Originally implemented by Ryan McGrath, Gengo. Reworked and added new
  * features by MDSystems.
  *
- * TMGMT vs myGengo jobs
+ * TMGMT vs Gengo jobs
  * =====================
  * TMGMT manages translation jobs which are containers for job items and those
  * are divided into data items.
@@ -41,7 +41,7 @@ function tmgmt_mygengo_menu() {
 }
 
 /**
- * Submit callback to poll translations form myGengo.
+ * Submit callback to poll translations form Gengo.
  */
 function _tmgmt_mygengo_poll_submit($form, &$form_state) {
   /**
@@ -70,11 +70,11 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
       $controller->saveTranslation($job, $gengo_mappings[$response_job->job_id]->data_item_key, $response_job);
     }
 
-    drupal_set_message(t('All available translations from myGengo have been polled.'));
+    drupal_set_message(t('All available translations from Gengo have been polled.'));
   }
   else {
     drupal_set_message(t('myGengo did not provide any translations.'));
-    watchdog('tmgmt_mygengo', 'Error polling translations from myGengo with response @response',
+    watchdog('tmgmt_mygengo', 'Error polling translations from Gengo with response @response',
       array('@response' => var_export($response, TRUE)), WATCHDOG_WARNING);
   }
 }
@@ -122,8 +122,8 @@ function tmgmt_mygengo_access_check() {
 function tmgmt_mygengo_tmgmt_translator_plugin_info() {
   return array(
     'mygengo' => array(
-      'label' => t('myGengo translator'),
-      'description' => t('A myGengo translator service.'),
+      'label' => t('Gengo translator'),
+      'description' => t('A Gengo translator service.'),
       'plugin controller class' => 'TMGMTMyGengoTranslatorPluginController',
       'ui controller class' => 'TMGMTMyGengoTranslatorUIController',
       'default settings' => array(

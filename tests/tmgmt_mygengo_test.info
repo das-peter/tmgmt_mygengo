@@ -1,5 +1,5 @@
-name = MyGengo Translator Test Service Mocker
-description = Provides a local implementation of the MyGengo Translater API
+name = Gengo Translator Test Service Mocker
+description = Provides a local implementation of the Gengo Translater API
 package = Translation Management
 core = 7.x
 

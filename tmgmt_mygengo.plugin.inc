@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Provides myGengo translation plugin controller.
+ * Provides Gengo translation plugin controller.
  */
 
 /**
- * myGengo translation plugin controller.
+ * Gengo translation plugin controller.
  */
 class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController implements TMGMTTranslatorRejectDataItem {
 
@@ -17,13 +17,13 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    *
    * @var string
    */
-  protected $apiURL = 'http://api.mygengo.com';
+  protected $apiURL = 'http://api.gengo.com';
 
   /**
    * Translation sandbox service URL.
    * @var string
    */
-  protected $sandboxURL = 'http://api.sandbox.mygengo.com';
+  protected $sandboxURL = 'http://api.sandbox.gengo.com';
 
   /**
    * Translation service API version.
@@ -117,7 +117,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     $this->singleDataItemKey = implode('][', $key);
     $this->requestTranslation($job);
 
-    $job_item->addMessage('Job data item %label has been resubmitted to myGengo translate service.', array('%label' => tmgmt_data_item_label($data_item)));
+    $job_item->addMessage('Job data item %label has been resubmitted to Gengo translate service.', array('%label' => tmgmt_data_item_label($data_item)));
 
     return TRUE;
   }
@@ -128,7 +128,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function rejectForm($form, &$form_state) {
     $form['message'] = array(
       '#markup' => '<div class="messages warning">' .
-          t('By rejecting this item you will submit a new translate job to the myGengo translate service which will result in additional costs.') . '</div>',
+          t('By rejecting this item you will submit a new translate job to the Gengo translate service which will result in additional costs.') . '</div>',
     );
     $form['comment'] = array(
       '#type' => 'textarea',
@@ -139,10 +139,10 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Builds, signs and fires a request to myGengo's API.
+   * Builds, signs and fires a request to Gengo's API.
    *
    * Authentication rituals are documented here:
-   * http://mygengo.com/api/developer-docs/authentication/
+   * http://developers.gengo.com/v2/authentication/
    *
    * It should be noted that the authentication ritual listed there is
    * different from the one here (v1 vs v1.1, respectively). v1.1 doesn't
@@ -159,7 +159,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function requestFromGengo(TMGMTTranslator $translator, $endpoint, $method, $data = array()) {
     $options = array(
       'headers' => array(
-        'User-Agent' => 'Drupal myGengo Translation Interface v0.1',
+        'User-Agent' => 'Drupal Gengo Translation Interface v0.1',
         'Accept' => 'application/json'
       ),
       'method' => $method,
@@ -201,7 +201,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     }
 
     if ($response->code != 200) {
-      throw new TMGMTException('Unable to connect to myGengo service due to following error: @error at @url',
+      throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
         array('@error' => $response->error, '@url' => $url));
     }
 
@@ -320,7 +320,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Receives and stores a translation returned by myGengo.
+   * Receives and stores a translation returned by Gengo.
    */
   public function saveTranslation(TMGMTJob $job, $keys, $data) {
     if ($data->status == 'approved') {

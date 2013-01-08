@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Test cases for the MyGengo translator module.
+ * Test cases for the Gengo translator module.
  */
 
 /**
- * Basic tests for the MyGengo translator.
+ * Basic tests for the Gengo translator.
  */
 class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
@@ -20,8 +20,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
    */
   static function getInfo() {
     return array(
-      'name' => t('MyGengo Translator tests'),
-      'description' => t('Tests the MyGengo translator plugin integration.'),
+      'name' => t('Gengo Translator tests'),
+      'description' => t('Tests the Gengo translator plugin integration.'),
       'group' => t('Translation Management'),
     );
   }
