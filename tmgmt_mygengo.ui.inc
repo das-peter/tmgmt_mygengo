@@ -83,35 +83,38 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       $job->settings['quality'] = 'standard';
     }
 
-    $tier_names = $options = array(
+    $tier_names = array(
+      'machine' => t('Machine'),
       'standard' => t('Standard'),
       'pro' => t('Business'),
-      // Gengo service does not support ultra quality for grouped jobs and we
-      // send all jobs as grouped. We need to wait until gengo will support
-      // grouped jobs for ultra quality as well.
-      //'ultra' => t('Ultra'),
+      'ultra' => t('Ultra'),
     );
-    $gengo_language_pairs = $plugin->getGengoLanguagePairs($job->getTranslator(), $job->source_language, $job->target_language);
+
     $available_tiers = array();
+    // Machine translation is always available.
+    $available_tiers['machine'] = $tier_names['machine'];
 
     // Build quality options based on returned language pairs data. This
     // approach will filter out tiers that are not supported for current
     // source/target lang pair.
+    $gengo_language_pairs = $plugin->getGengoLanguagePairs($job->getTranslator(), $job->source_language, $job->target_language);
     foreach ($gengo_language_pairs as $tier) {
-      $available_tiers[$tier->tier] = $options[$tier->tier] =
-        t('@tier (@cost @currency per word)', array(
-          '@tier' => $tier_names[$tier->tier],
-          '@cost' => number_format($tier->unit_price, 2),
-          '@currency' => $tier->currency,
-        ));
+      $available_tiers[$tier->tier] = t('@tier (@cost @currency per word)', array(
+        '@tier' => empty($tier_names[$tier->tier]) ? $tier->tier : $tier_names[$tier->tier],
+        '@cost' => number_format($tier->unit_price, 2),
+        '@currency' => $tier->currency,
+      ));
     }
-    $options = array_intersect_key($available_tiers, $options);
-    $options = array_merge(array('machine' => t('Machine')), $options);
+
+    // Gengo service does not support ultra quality for grouped jobs and we
+    // send all jobs as grouped. We need to wait until gengo will support
+    // grouped jobs for ultra quality as well.
+    unset($available_tiers['ultra']);
 
     $settings['quality'] = array(
       '#type' => 'select',
       '#title' => t('Quality'),
-      '#options' => $options,
+      '#options' => $available_tiers,
       '#default_value' => $job->settings['quality'],
       '#description' => t('Choose the level of quality for this translation job.'),
       '#ajax' => array(
