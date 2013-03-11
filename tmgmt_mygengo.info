@@ -3,6 +3,7 @@ description = Crowd-sourced translation service, former myGengo. Sign up at http
 package = Translation Management
 core = 7.x
 dependencies[] = tmgmt
+test_dependencies[] = rules
 files[] = tmgmt_mygengo.plugin.inc
 files[] = tmgmt_mygengo.ui.inc
 files[] = tmgmt_mygengo.test
