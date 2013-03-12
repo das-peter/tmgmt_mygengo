@@ -4,6 +4,7 @@ package = Translation Management
 core = 7.x
 dependencies[] = tmgmt
 test_dependencies[] = rules
+test_dependencies[] = tmgmt_ui
 files[] = tmgmt_mygengo.plugin.inc
 files[] = tmgmt_mygengo.ui.inc
 files[] = tmgmt_mygengo.test
