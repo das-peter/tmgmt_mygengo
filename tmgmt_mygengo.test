@@ -130,7 +130,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $data = variable_get('tmgmt_mygengo_test_last_gengo_response', FALSE);
     // Find the key under which we can access the job received:
     $jobs = $data->jobs;
-    $key = array_shift(array_keys($jobs));
+    $job_keys = array_keys($jobs);
+    $key = array_shift($job_keys);
     $this->assertEqual($data->jobs[$key]->slug, $item->data['wrapper']['#label']);
 
     // Now it should be needs review.
@@ -240,7 +241,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     // Navigate to the review tool and check if the data item is pending.
     $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
-    $state_icon = array_shift($this->xpath('//tr[@id="tmgmt-ui-element-wrapper-subwrapper"]/td[1]/div[@class="tmgmt-ui-state"]'));
+    $xpath = $this->xpath('//tr[@id="tmgmt-ui-element-wrapper-subwrapper"]/td[1]/div[@class="tmgmt-ui-state"]');
+    $state_icon = array_shift($xpath);
     $this->assertEqual($state_icon->div['title'], t('Pending'));
 
     // Create a gengo response of translated and approved job that will be

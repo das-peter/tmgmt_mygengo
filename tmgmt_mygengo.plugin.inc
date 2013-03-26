@@ -372,7 +372,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     if (!empty($target_language)) {
       $lang_pairs = array();
 
-      foreach ($this->gengoLanguagePairs[source_language] as $lang_pair) {
+      foreach ($this->gengoLanguagePairs[$source_language] as $lang_pair) {
         if ($lang_pair->lc_tgt == $this->mapToRemoteLanguage($translator, $target_language)) {
           $lang_pairs[] = $lang_pair;
         }
