@@ -59,6 +59,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function getDefaultRemoteLanguagesMappings() {
     return array(
       'zh-hans' => 'zh',
+      'zh-hant' => 'zh-tw',
     );
   }
 
