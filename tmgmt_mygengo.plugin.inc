@@ -335,11 +335,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       return $this->supportedRemoteLanguages;
     }
 
-    foreach (language_list() as $language) {
-      $gengo_languages = $this->getGengoLanguagePairs($translator, $language);
-      foreach($gengo_languages as $gengo_language) {
-        $this->supportedRemoteLanguages[$gengo_language->lc_tgt] = $gengo_language->lc_tgt;
+    try {
+      $languages = $this->requestFromGengo($translator, 'translate/service/languages', 'GET');
+      foreach($languages as $gengo_language) {
+        $this->supportedRemoteLanguages[$gengo_language->lc] = $gengo_language->lc;
       }
+    }
+    catch (TMGMTException $e) {
+      watchdog_exception('tmgmt', $e);
     }
 
     return $this->supportedRemoteLanguages;
@@ -356,8 +359,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    */
   public function getGengoLanguagePairs(TMGMTTranslator $translator, $source_language, $target_language = NULL) {
     try {
-      if (empty($this->gengoLanguagePairs)) {
-        $this->gengoLanguagePairs = $this->requestFromGengo($translator, 'translate/service/language_pairs',
+      if (empty($this->gengoLanguagePairs[$source_language])) {
+        $this->gengoLanguagePairs[$source_language] = $this->requestFromGengo($translator, 'translate/service/language_pairs',
           'GET', array('lc_src' => $this->mapToRemoteLanguage($translator, $source_language)));
       }
     }
@@ -369,7 +372,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     if (!empty($target_language)) {
       $lang_pairs = array();
 
-      foreach ($this->gengoLanguagePairs as $lang_pair) {
+      foreach ($this->gengoLanguagePairs[source_language] as $lang_pair) {
         if ($lang_pair->lc_tgt == $this->mapToRemoteLanguage($translator, $target_language)) {
           $lang_pairs[] = $lang_pair;
         }
@@ -378,7 +381,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       return $lang_pairs;
     }
 
-    return $this->gengoLanguagePairs;
+    return $this->gengoLanguagePairs[$source_language];
   }
 
   /**
