@@ -53,17 +53,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    */
   protected $serviceComment;
 
-  /**
-   * Mapping table of Drupal lang codes to Gengo lang codes.
-   *
-   * @var array
-   */
-  protected $langCodesMapping = array(
-    'zh-hans' => 'zh',
-  );
-
   protected $gengoLanguagePairs = array();
 
+
+  public function getDefaultRemoteLanguagesMappings() {
+    return array(
+      'zh-hans' => 'zh',
+    );
+  }
 
   /**
    * Sets comment to be sent to gengo service with job post request.
@@ -330,6 +327,24 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
+   * Implements TMGMTDefaultTranslatorPluginController::getSupportedRemoteLanguages().
+   */
+  function getSupportedRemoteLanguages(TMGMTTranslator $translator) {
+    if (!empty($this->supportedRemoteLanguages)) {
+      return $this->supportedRemoteLanguages;
+    }
+
+    foreach (language_list() as $language) {
+      $gengo_languages = $this->getGengoLanguagePairs($translator, $language);
+      foreach($gengo_languages as $gengo_language) {
+        $this->supportedRemoteLanguages[$gengo_language->lc_tgt] = $gengo_language->lc_tgt;
+      }
+    }
+
+    return $this->supportedRemoteLanguages;
+  }
+
+  /**
    * Gets gengo language pairs.
    *
    * @param TMGMTTranslator $translator
@@ -342,7 +357,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     try {
       if (empty($this->gengoLanguagePairs)) {
         $this->gengoLanguagePairs = $this->requestFromGengo($translator, 'translate/service/language_pairs',
-          'GET', array('lc_src' => $this->mapToGengoLangCode($source_language)));
+          'GET', array('lc_src' => $this->mapToRemoteLanguage($translator, $source_language)));
       }
     }
     catch (TMGMTException $e) {
@@ -354,7 +369,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       $lang_pairs = array();
 
       foreach ($this->gengoLanguagePairs as $lang_pair) {
-        if ($lang_pair->lc_tgt == $target_language) {
+        if ($lang_pair->lc_tgt == $this->mapToRemoteLanguage($translator, $target_language)) {
           $lang_pairs[] = $lang_pair;
         }
       }
@@ -441,8 +456,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
   public function canTranslate(TMGMTTranslator $translator, TMGMTJob $job) {
 
-    $target_lang = $this->mapToGengoLangCode($job->target_language);
-    $source_lang = $this->mapToGengoLangCode($job->source_language);
+    $target_lang = $this->mapToRemoteLanguage($translator, $job->target_language);
+    $source_lang = $this->mapToRemoteLanguage($translator, $job->source_language);
 
     if ($this->isAvailable($translator) && array_key_exists($target_lang, $translator->getSupportedTargetLanguages($source_lang))) {
       return TRUE;
@@ -500,8 +515,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         'type' => 'text',
         'slug' => tmgmt_data_item_label($value),
         'body_src' => $value['#text'],
-        'lc_src' => $this->mapToGengoLangCode($job->source_language),
-        'lc_tgt' => $this->mapToGengoLangCode($job->target_language),
+        'lc_src' => $this->mapToRemoteLanguage($job->getTranslator(), $job->source_language),
+        'lc_tgt' => $this->mapToRemoteLanguage($job->getTranslator(), $job->target_language),
         'tier' => $job->settings['quality'],
         'callback_url' => url('tmgmt_mygengo_callback', array('absolute' => TRUE)),
         'custom_data' => $job->tjid . '][' . $key,
@@ -527,22 +542,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       // In case we send one job item as group we will get error from Gengo.
       'as_group' => (int) (count($translations) > 1),
     ));
-  }
-
-  /**
-   * Maps Drupal lang code to Gengo lang code.
-   *
-   * @param string $drupal_code
-   *
-   * @return string
-   *   Lang code.
-   */
-  protected function mapToGengoLangCode($drupal_code) {
-    if (isset($this->langCodesMapping[$drupal_code])) {
-      return $this->langCodesMapping[$drupal_code];
-    }
-
-    return $drupal_code;
   }
 
   /**
