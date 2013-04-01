@@ -330,4 +330,72 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertEqual('Translated Some text that has been submitted and translated.', $data['wrapper']['#translation']['#text']);
 
   }
+
+  /**
+   * Tests that duplicated strings can be translated correctly.
+   */
+  function testDuplicateStrings() {
+    $this->loginAsAdmin();
+
+    // Make sure we have correct keys.
+    $this->translator->settings['api_public_key'] = 'correct key';
+    $this->translator->settings['api_private_key'] = 'correct key';
+
+    $this->translator->save();
+
+    $job = $this->createJob();
+    // Set quality to machine so it gets translated right away.
+    // @todo: Add tests for standard.
+    $job->settings['quality'] = 'machine';
+    $job->translator = $this->translator->name;
+    $job->save();
+    $item1 = $job->addItem('test_source', 'test', '1');
+    $item1->data = array(
+      'wrapper' => array(
+        '#label' => 'Parent label',
+        'duplicate1' => array(
+          '#text' => 'This text is a duplicate',
+          '#label' => 'Duplicate label 1',
+        ),
+        'duplicate2' => array(
+          '#text' => 'This text is a duplicate',
+          '#label' => 'Duplicate label 2',
+        ),
+      ),
+    );
+    $item1->save();
+    $item2 = $job->addItem('test_source', 'test', '2');
+    $item2->data = array(
+      'wrapper' => array(
+        '#label' => 'Parent label',
+        'duplicate1' => array(
+          '#text' => 'Not duplicate but same key',
+          '#label' => 'Not duplicate',
+        ),
+        'real_duplicate' => array(
+          '#text' => 'This text is a duplicate',
+          '#label' => 'Duplicate label 3',
+        ),
+      ),
+    );
+    $item2->save();
+
+    $job->requestTranslation();
+
+    // Make sure the duplicated and not duplicated texts are translated.
+    entity_get_controller('tmgmt_job_item')->resetCache();
+    list($item1, $item2) = array_values($job->getItems());
+
+    // Item 1.
+    $this->assertTrue($item1->isNeedsReview());
+    $data = $item1->getData();
+    $this->assertEqual('mt_de_This text is a duplicate', $data['wrapper']['duplicate1']['#translation']['#text']);
+    $this->assertEqual('mt_de_This text is a duplicate', $data['wrapper']['duplicate2']['#translation']['#text']);
+
+    // Item 2.
+    $data = $item2->getData();
+    $this->assertTrue($item2->isNeedsReview());
+    $this->assertEqual('mt_de_This text is a duplicate', $data['wrapper']['real_duplicate']['#translation']['#text']);
+    $this->assertEqual('mt_de_Not duplicate but same key', $data['wrapper']['duplicate1']['#translation']['#text']);
+  }
 }

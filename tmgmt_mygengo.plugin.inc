@@ -324,6 +324,23 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     if ($data->status == 'approved') {
       $keys = tmgmt_ensure_keys_array($keys);
       $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
+
+      // Look for duplicated strings that were saved with a mapping to this key.
+      // @todo: Allow additional conditions in TmgmtJob::getRemoteMappings()?
+      $query = new EntityFieldQuery();
+      $query->entityCondition('entity_type', 'tmgmt_remote');
+      $query->propertyCondition('tjid', $job->tjid);
+      $query->propertyCondition('remote_identifier_1', tmgmt_ensure_keys_string($keys));
+
+      $result = $query->execute();
+
+      if (isset($result['tmgmt_remote'])) {
+        $remote_mappings = entity_load('tmgmt_remote', array_keys($result['tmgmt_remote']));
+        // If we found any mappings, also add the translation for those.
+        foreach ($remote_mappings as $remote_mapping) {
+          $job->addTranslatedData(array('#text' => $data->body_tgt), $remote_mapping->data_item_key);
+        }
+      }
     }
   }
 
@@ -504,6 +521,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
     $translations = array();
 
+    $sources = array();
+
     foreach ($data as $key => $value) {
       if (isset($value['#translate']) && $value['#translate'] === FALSE) {
         continue;
@@ -514,6 +533,26 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       if (!empty($this->singleDataItemKey) && $key != $this->singleDataItemKey) {
         continue;
       }
+
+      if (!$quote_only) {
+        // Detect duplicate source strings and add a mapping for them.
+        if ($duplicate_key = array_search($value['#text'], $sources)) {
+
+          // Only add the actual mapping in case we are not requesting a quote.
+          if (!$quote_only) {
+            // Get the job item.
+            // @todo: This is not very nice. We should possibly support this
+            //   directly on the job.
+            $tjiid = substr($key, 0, strpos($key, ']'));
+            $job_item = tmgmt_job_item_load($tjiid);
+            $job_item->addRemoteMapping($key, $duplicate_key);
+          }
+          continue;
+        }
+      }
+
+      // Keep track of source texts for easy lookup.
+      $sources[$key] = $value['#text'];
 
       $translations[$job->tjid . '][' . $key] = array(
         'type' => 'text',

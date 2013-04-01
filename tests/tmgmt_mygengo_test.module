@@ -57,11 +57,22 @@ function tmgmt_mygengo_test_service_translate() {
 
   $response = new stdClass();
 
+  $sources = array();
+
   // Use case when jobs have been submitted to gengo.
   if (!empty($_POST['data'])) {
     $data = json_decode($_POST['data']);
 
     foreach ($data->jobs as $id => $job) {
+
+      // Simulate API behavior to ignore multiple jobs with the same source.
+      if (array_search($job->body_src, $sources)) {
+        continue;
+      }
+
+      // Keep track of source strings.
+      $sources[$id] = $job->body_src;
+
       // Machine translation - simulate returning translation job right away.
       if ($job->tier == 'machine') {
         $body_tgt = 'mt_de_' . $job->body_src;
