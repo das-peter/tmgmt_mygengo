@@ -462,6 +462,23 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
+   * Pulls remaining credit info from the gengo service.
+   *
+   * @param TMGMTJob $job
+   *
+   * @return string
+   */
+  public function getRemainingCredit(TMGMTJob $job) {
+    try {
+      $response = $this->requestFromGengo($job->getTranslator(), 'account/balance', 'GET');
+      return $response->credits;
+    }
+    catch (TMGMTException $e) {
+      return t('error');
+    }
+  }
+
+  /**
    * Fetches gengo job from the gengo service.
    *
    * @param TMGMTTranslator $translator

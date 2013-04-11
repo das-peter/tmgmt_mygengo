@@ -57,6 +57,12 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#default_value' => $translator->getSetting('use_preferred'),
       '#description' => t('Check to use translators from the preferred translators list associated with your Gengo account.'),
     );
+    $form['show_remaining_credits_info'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show remaining credit info'),
+      '#default_value' => $translator->getSetting('show_remaining_credits_info'),
+      '#description' => t('Check to display remaining Gengo credit at the job checkout page.'),
+    );
 
     return parent::pluginSettingsForm($form, $form_state, $translator, $busy);
   }
@@ -69,6 +75,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
      * @var TMGMTMyGengoTranslatorPluginController $plugin
      */
     $plugin = tmgmt_translator_plugin_controller($this->pluginType);
+    $translator = $job->getTranslator();
 
     // Set the quality setting from submitted vals - we need this for quote as
     // repetitive change of Quality select will not update the job settings.
@@ -95,7 +102,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     // Build quality options based on returned language pairs data. This
     // approach will filter out tiers that are not supported for current
     // source/target lang pair.
-    $gengo_language_pairs = $plugin->getGengoLanguagePairs($job->getTranslator(), $job->source_language, $job->target_language);
+    $gengo_language_pairs = $plugin->getGengoLanguagePairs($translator, $job->source_language, $job->target_language);
     foreach ($gengo_language_pairs as $tier) {
       $available_tiers[$tier->tier] = t('@tier (@cost @currency per word)', array(
         '@tier' => empty($tier_names[$tier->tier]) ? $tier->tier : $tier_names[$tier->tier],
@@ -155,6 +162,13 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
         '#title' => t('Needed Credits'),
         '#markup' => number_format($quote['sum_credits'], 2) . ' ' . $quote['currency'],
       );
+      if ($translator->getSetting('show_remaining_credits_info')) {
+        $settings['quote']['remaining_credits'] = array(
+          '#type' => 'item',
+          '#title' => t('Remaining Credits'),
+          '#markup' => $plugin->getRemainingCredit($job),
+        );
+      }
       $settings['quote']['eta'] = array(
         '#type' => 'item',
         '#title' => t('ETA'),
