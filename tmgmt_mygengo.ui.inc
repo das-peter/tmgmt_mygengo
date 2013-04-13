@@ -185,4 +185,22 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
 
     return $settings;
   }
+
+  /**
+   * Implements TMGMTTranslatorUIControllerInterface::checkoutInfo().
+   */
+  public function checkoutInfo(TMGMTJob $job) {
+    $form = array();
+
+    if ($job->isActive()) {
+      $form['actions']['poll'] = array(
+        '#type' => 'submit',
+        '#value' => t('Poll translations'),
+        '#submit' => array('_tmgmt_mygengo_poll_submit'),
+        '#weight' => -10,
+      );
+    }
+
+    return $form;
+  }
 }
