@@ -112,8 +112,8 @@ function tmgmt_mygengo_test_service_translate() {
     variable_set('tmgmt_mygengo_test_last_gengo_response', $response);
   }
 
-  // TODO - to fix tests I believe this has to be changed in some cases. Just
-  // return the $response not the structure.
+  // @todo To fix tests I believe this has to be changed in some cases. Just
+  //   return the $response not the structure.
   drupal_json_output(array(
     'opstat' => 'ok',
     'response' => $response,

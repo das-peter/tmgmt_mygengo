@@ -345,7 +345,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     $job = $this->createJob();
     // Set quality to machine so it gets translated right away.
-    // @todo: Add tests for standard.
+    // @todo Add tests for standard.
     $job->settings['quality'] = 'machine';
     $job->translator = $this->translator->name;
     $job->save();

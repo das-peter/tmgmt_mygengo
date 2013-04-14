@@ -18,12 +18,12 @@
  *
  * TODOs
  * =====================
- * 1) With the poll feature we added a mapping table of data items to myGengo jobs.
- * Therefore it is possible to implement regular review-reject process instead
- * of current feature which submits a completely new job to myGengo.
+ * @todo With the poll feature we added a mapping table of data items to myGengo jobs.
+ *   Therefore it is possible to implement regular review-reject process instead
+ *   of current feature which submits a completely new job to myGengo.
  *
- * 2) Do we need access check? Review possible scenarios and either remove it
- * completely or add some meaning full access control.
+ * @todo Do we need access check? Review possible scenarios and either remove it
+ *   completely or add some meaning full access control.
  */
 
 /**

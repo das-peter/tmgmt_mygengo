@@ -214,7 +214,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       $gengo_err = $results->err;
     }
     // In case of multiple, take only the first one - they are usually the same.
-    // TODO - handle multiple errors received from gengo.
+    // @todo Handle multiple errors received from gengo.
     else {
       $gengo_err = reset($results->err);
       $gengo_err = array_shift($gengo_err);
@@ -279,8 +279,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
       // Duplicate content has been submitted.
       if (isset($response_job->duplicate)) {
-        // TODO - we need to handle duplicates in some way as client will not
-        // receive translation for this item.
+        // @todo We need to handle duplicates in some way as client will not
+        //   receive translation for this item.
         continue;
       }
 
@@ -326,7 +326,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
 
       // Look for duplicated strings that were saved with a mapping to this key.
-      // @todo: Allow additional conditions in TmgmtJob::getRemoteMappings()?
+      // @todo Allow additional conditions in TmgmtJob::getRemoteMappings()?
       $query = new EntityFieldQuery();
       $query->entityCondition('entity_type', 'tmgmt_remote');
       $query->propertyCondition('tjid', $job->tjid);
@@ -558,7 +558,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
           // Only add the actual mapping in case we are not requesting a quote.
           if (!$quote_only) {
             // Get the job item.
-            // @todo: This is not very nice. We should possibly support this
+            // @todo This is not very nice. We should possibly support this
             //   directly on the job.
             $tjiid = substr($key, 0, strpos($key, ']'));
             $job_item = tmgmt_job_item_load($tjiid);
