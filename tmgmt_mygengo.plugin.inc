@@ -147,11 +147,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * require signing on the entire data structure, just a timestamp and keys.
    *
    * @param TMGMTTranslator $translator
-   * @param $endpoint
+   * @param string $endpoint
+   *   Resource path.
    * @param $method
+   *   HTTP method (GET, POST...)
    * @param array $data
+   *   Data to send to gengo service.
    *
    * @return object
+   *   Response object from gengo.
+   *
    * @throws TMGMTException
    */
   public function requestFromGengo(TMGMTTranslator $translator, $endpoint, $method, $data = array()) {
@@ -198,7 +203,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       ), WATCHDOG_DEBUG);
     }
 
-    if ($response->code != 200) {
+    if ($response->code != 200 && $response->code != 201) {
       throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
         array('@error' => $response->error, '@url' => $url));
     }
@@ -300,8 +305,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         $key = $response_job->custom_data;
       }
 
-      $key = array_slice(tmgmt_ensure_keys_array($key), 1);
-      $this->saveTranslation($job, $key, $response_job);
+      $this->saveTranslation($job, array_slice(tmgmt_ensure_keys_array($key), 1), $response_job);
 
       $mappings[] = array(
         'tjid' => $job->tjid,
@@ -369,8 +373,11 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Gets gengo language pairs.
    *
    * @param TMGMTTranslator $translator
+   *   Translator plugin.
    * @param $source_language
+   *   Source language code.
    * @param $target_language
+   *   Target language code.
    *
    * @return array
    */
@@ -418,6 +425,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Get a quote from Gengo for the given job.
    *
    * @param TMGMTJob $job
+   *   Job for which to get a quote.
    *
    * @return array
    *   Array with the following keys: currency, estimates, highest_eta,
@@ -479,9 +487,53 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
+   * Posts new comment to gengo service.
+   *
+   * @param TMGMTTranslator $translator
+   *   Translator plugin.
+   * @param int $gengo_job_id
+   *   Gengo job id to which to submit comment
+   * @param string $comment
+   *   Comment text.
+   */
+  function gengoPostComment(TMGMTTranslator $translator, $gengo_job_id, $comment) {
+    $this->requestFromGengo($translator, 'translate/job/' . $gengo_job_id . '/comment', 'POST', array('body' => $comment));
+  }
+
+  /**
+   * Fetches comments from gengo service.
+   *
+   * @param TMGMTTranslator $translator
+   *   Translator plugin.
+   * @param $gengo_job_id
+   *   Gengo job id for which to fetch comments.
+   * @param boolean $reload
+   *   Flag to reload cache.
+   *
+   * @return array
+   */
+  function gengoFetchComments(TMGMTTranslator $translator, $gengo_job_id, $reload = FALSE) {
+
+    $cid = 'tmgmt_mygengo_comments_' . $gengo_job_id;
+    $cache = cache_get($cid, 'cache_tmgmt');
+
+    if (isset($cache->data) && !$reload && $cache->expire > REQUEST_TIME) {
+      return $cache->data;
+    }
+
+    $response = $this->requestFromGengo($translator, 'translate/job/' . $gengo_job_id . '/comments', 'GET');
+    $data = isset($response->thread) ? $response->thread : NULL;
+
+    cache_set($cid, $data, 'cache_tmgmt', REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
+
+    return $data;
+  }
+
+  /**
    * Fetches gengo job from the gengo service.
    *
    * @param TMGMTTranslator $translator
+   *   Translator plugin.
    * @param $gengo_job_id
    *   External job id.
    *
@@ -507,6 +559,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Approves job at gengo side.
    *
    * @param TMGMTTranslator $translator
+   *   Translator plugin.
    * @param $gengo_job_id
    *   External job id.
    * @param array $data
@@ -526,6 +579,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Will build and send a job to gengo service.
    *
    * @param TMGMTJob $job
+   *   Job to be submitted for translation.
    * @param boolean $quote_only
    *   (Optional) Set to TRUE to only get a quote for the given job.
    *
@@ -635,6 +689,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * gegngo order id before we get gengo job ids.
    *
    * @param TMGMTJob $job
+   *   Job for which to initiate mappings with remote jobs.
    * @param int $gorder_id
    *   Gengo job id.
    */
@@ -650,6 +705,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Maps TMGMT job data items to gengo jobs.
    *
    * @param TMGMTJob $job
+   *   Job that will be mapped to remote jobs.
    */
   public function mapGengoJobs(TMGMTJob $job) {
 
@@ -772,6 +828,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Gets gengo mappings not being mapped to local data items.
    *
    * @param int $tjid
+   *   Job id for which to get mapping data.
+   *
    * @return array
    *   Array of mapping records keyd by gengo job ids.
    */

@@ -1,0 +1,30 @@
+div.input-wrapper {
+  display: none;
+}
+
+div.comments-pane {
+  margin-bottom: 10px;
+}
+
+div.comments-wrapper ul li {
+  list-style: none;
+  border: 1px solid silver;
+  padding: 10px;
+  margin: 0 0 4px;
+}
+
+div.gengo-comment-meta {
+  background: #dedede;
+  padding: 0 4px;
+  font-size: 0.9em;
+}
+
+div.gengo-comment-body {
+  width: 100%;
+  margin: 10px 0 0;
+}
+
+input.new-comment-button {
+  font-size: 18px !important;
+  padding: 2px 16px !important;
+}

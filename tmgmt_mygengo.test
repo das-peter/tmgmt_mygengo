@@ -398,4 +398,67 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertEqual('mt_de_This text is a duplicate', $data['wrapper']['real_duplicate']['#translation']['#text']);
     $this->assertEqual('mt_de_Not duplicate but same key', $data['wrapper']['duplicate1']['#translation']['#text']);
   }
+
+  function testComments() {
+    $this->loginAsAdmin();
+
+    // Create job with two job items.
+
+    $this->translator->settings['api_public_key'] = 'correct key';
+    $this->translator->settings['api_private_key'] = 'correct key';
+    $this->translator->save();
+    $job = $this->createJob();
+    $job->settings['quality'] = 'machine';
+    $job->translator = $this->translator->name;
+    $job->save();
+    $item = $job->addItem('test_source', 'test', '1');
+    $item->data = array(
+      'title' => array(
+        '#text' => 'Hello world',
+        '#label' => 'Title',
+      ),
+      'body' => array(
+        '#text' => 'This is some testing content',
+        '#label' => 'Body',
+      ),
+    );
+    $item->save();
+    $item = $job->addItem('test_source', 'test', '2');
+    $item->data = array(
+      'title' => array(
+        '#text' => 'Nice day',
+        '#label' => 'Title',
+      ),
+      'body' => array(
+        '#text' => 'It is nice day out there',
+        '#label' => 'Body',
+      ),
+    );
+    $item->save();
+
+    // Request translation which also must create remote job mappings.
+    $job->requestTranslation();
+
+    /**
+     * @var TMGMTMyGengoTranslatorPluginController $plugin
+     */
+    $plugin = $job->getTranslatorController();
+    $mapping = NULL;
+
+    // Get mapping for first data item of second job item -> Title "Nice day".
+    foreach ($plugin->getMappedGengoData($job->tjid) as $gjid => $mapping) {
+      if ($mapping->data_item_key == $job->tjid . '][' . $item->tjiid . '][title') {
+        break;
+      }
+    }
+
+    // Post comment - this must be possible if mappings are correct.
+    $comment = $this->randomName();
+    $this->drupalPostAJAX('admin/config/regional/tmgmt/items/' . $item->tjiid,
+      array($mapping->gjid . '_comment' => $comment), $mapping->gjid . '_submit');
+
+    // Reload the review form again and check if comment text is present.
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
+    $this->assertText($comment);
+  }
 }

@@ -26,6 +26,91 @@
  *   completely or add some meaning full access control.
  */
 
+define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
+
+/**
+ * Ajax callback for comment form.
+ */
+function tmgmt_mygengo_review_form_ajax($form, &$form_state) {
+  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_comments']['comments_wrapper'];
+}
+
+/**
+ * Validates comment to be sent to gengo service.
+ */
+function tmgmt_mygengo_add_comment_form_validate($form, &$form_state) {
+  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
+
+  if (empty($form_state['values'][$gengo_job_id . '_comment'])) {
+    form_set_error($gengo_job_id . '_comment', t('Comment body cannot be empty.'));
+  }
+}
+
+/**
+ * Submits comment to gengo service.
+ */
+function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
+  /* @var TMGMTJobItem $item */
+  $item = $form_state['item'];
+  $job = $item->getJob();
+  /* @var TMGMTMyGengoTranslatorPluginController $plugin */
+  $plugin = $job->getTranslatorController();
+
+  try {
+    $plugin->gengoPostComment($job->getTranslator(), $gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
+    $form_state['comment_submitted'] = 1;
+  }
+  catch (TMGMTException $e) {
+    watchdog_exception('tmgmt_mygengo', $e);
+    drupal_set_message(t('Unable to add comment.'), 'error');
+  }
+}
+
+/**
+ * Theme function to display comments thread.
+ *
+ * @param array $variables
+ *   - thread: Comments thread received from gengo service.
+ *
+ * @return string
+ *   HTML output.
+ */
+function theme_tmgmt_mygengo_comments_thread($variables) {
+  $thread = $variables['thread'];
+  $gengo_job_id = $variables['gengo_job_id'];
+  if (empty($thread) || !is_array($thread)) {
+    return '';
+  }
+
+  $comments = array();
+  $i = 0;
+
+  foreach ($thread as $comment) {
+    $zebra = ++$i%2 == 0 ? 'even' : 'odd';
+
+    $attributes = drupal_attributes(array('class' => array('gengo-comment-body', $zebra)));
+
+    $comments[] = '<div class="gengo-comment-meta">' .
+        t('At %time by %author:', array('%time' => format_date($comment->ctime), '%author' => $comment->author)) .
+        '</div><div ' . $attributes . '>' . check_plain($comment->body) . '</div>';
+  }
+
+  return theme('item_list', array('items' => $comments)) . '<div class="comments-list-closing" id="' . $gengo_job_id . '-comments-list-closing"></div>';
+}
+
+/**
+ * Implements hook_theme().
+ */
+function tmgmt_mygengo_theme() {
+  return array(
+    'tmgmt_mygengo_comments_thread' => array(
+      'variables' => array('thread' => NULL, 'gegno_job_id' => NULL),
+    ),
+  );
+}
+
 /**
  *  Implements hook_menu().
  */

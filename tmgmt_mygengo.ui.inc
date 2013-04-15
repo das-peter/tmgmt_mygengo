@@ -15,6 +15,111 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
    * Implements TMGMTTranslatorUIControllerInterface::reviewForm().
    */
   public function reviewForm($form, &$form_state, TMGMTJobItem $item) {
+    $job = $item->getJob();
+    /* @var TMGMTMyGengoTranslatorPluginController $plugin */
+    $plugin = $job->getTranslatorController();
+
+    $mapping_data = array();
+    foreach ($plugin->getMappedGengoData($job->tjid) as $info) {
+      $key_array = tmgmt_ensure_keys_array($info->data_item_key);
+      // Remove tjid.
+      array_shift($key_array);
+      // Remove tjjid.
+      array_shift($key_array);
+      // Create key which is used in the review form.
+      $key = str_replace('][', '|', implode('|', $key_array));
+      // Add into mapping data array.
+      $mapping_data[$key] = $info;
+    }
+
+    $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo_comments.js';
+    $form['#attached']['css'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/css/tmgmt_mygengo_comments.css';
+
+    $i = 0;
+    foreach (element_children($form['review']) as $key) {
+      $form_keys = element_children($form['review'][$key]);
+      $form_key = array_pop($form_keys);
+
+      // If we do not have mapping data yet for the data item continue.
+      if (!isset($mapping_data[$form_key])) {
+        continue;
+      }
+
+      $gengo_job_id = $mapping_data[$form_key]->gjid;
+
+      $form['review'][$key][$form_key]['actions']['comment'] = array(
+        '#type' => 'button',
+        '#value' => '✉',
+        '#attributes' => array('title' => t('Add new comment'), 'class' => array( $gengo_job_id . '-gengo-id', 'new-comment-button')),
+      );
+
+      $form['review'][$key]['#weight'] = $i++;
+
+      $form['review'][$gengo_job_id . '_comments'] = array(
+        '#prefix' => '<div class="comments-pane" id="' . $gengo_job_id . '-comments-pane">',
+        '#suffix' => '</div>',
+        '#weight' => $i++,
+      );
+
+      // Input pane.
+      $form['review'][$gengo_job_id . '_comments']['input_wrapper'] = array(
+        '#prefix' => '<div class="input-wrapper" id="' . $gengo_job_id . '-input-wrapper">',
+        '#suffix' => '</div>',
+      );
+      $form['review'][$gengo_job_id . '_comments']['input_wrapper'][$gengo_job_id . '_comment'] = array(
+        '#type' => 'textarea',
+        '#title' => t('New comment'),
+      );
+      $form['review'][$gengo_job_id . '_comments']['input_wrapper'][$gengo_job_id . '_submit'] = array(
+        '#type' => 'submit',
+        '#name' => $gengo_job_id . '_submit',
+        '#value' => t('Submit comment'),
+        '#validate' => array('tmgmt_mygengo_add_comment_form_validate'),
+        '#submit' => array('tmgmt_mygengo_add_comment_form_submit'),
+        '#gengo_job_id' => $gengo_job_id,
+        '#ajax' => array(
+          'callback' => 'tmgmt_mygengo_review_form_ajax',
+          'wrapper' => $gengo_job_id . '-comments-wrapper',
+        ),
+      );
+      $form['review'][$gengo_job_id . '_comments']['input_wrapper'][$gengo_job_id . '_cancel'] = array(
+        '#type' => 'button',
+        '#value' => t('Cancel'),
+        '#attributes' => array('class' => array( $gengo_job_id . '-gengo-id', 'cancel-comment-button')),
+      );
+      // Input pane end.
+
+      // Comments pane.
+      $form['review'][$gengo_job_id . '_comments']['comments_wrapper'] = array(
+        '#prefix' => '<div class="comments-wrapper" id="' . $gengo_job_id . '-comments-wrapper">',
+        '#suffix' => '</div>',
+      );
+
+      $reload_comments = !empty($form_state['comment_submitted']) ? $form_state['comment_submitted'] : FALSE;
+
+      try {
+        $thread = $plugin->gengoFetchComments($job->getTranslator(), $gengo_job_id, $reload_comments);
+      }
+      catch (TMGMTException $e) {
+        watchdog_exception('tmgmt_mygengo', $e);
+        $thread = NULL;
+      }
+
+      $form['review'][$gengo_job_id . '_comments']['comments_wrapper']['comments'] = array(
+        '#type' => 'markup',
+        '#markup' => theme('tmgmt_mygengo_comments_thread', array('thread' => $thread, 'gengo_job_id' => $gengo_job_id)),
+        '#tree' => FALSE,
+      );
+
+      if (!empty($form_state['comment_submitted'])) {
+        $form['review'][$gengo_job_id . '_comments']['comments_wrapper']['submitted_comment_gengo_id'] = array(
+          '#type' => 'hidden',
+          '#value' => $gengo_job_id,
+        );
+      }
+      // Comments pane end.
+    }
+
     return $form;
   }
 
