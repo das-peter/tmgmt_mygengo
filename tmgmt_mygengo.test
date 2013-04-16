@@ -461,4 +461,54 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
     $this->assertText($comment);
   }
+
+  function testPollJob() {
+    $this->loginAsAdmin();
+    $this->translator->settings['api_public_key'] = 'correct key';
+    $this->translator->settings['api_private_key'] = 'correct key';
+    $this->translator->save();
+    $job = $this->createJob();
+    $job->settings['quality'] = 'standard';
+    $job->translator = $this->translator->name;
+    $job->save();
+    $item = $job->addItem('test_source', 'test', '1');
+    $item->data = array(
+      'title' => array(
+        '#text' => 'Hello world',
+        '#label' => 'Title',
+      ),
+      'body' => array(
+        '#text' => 'This is some testing content',
+        '#label' => 'Body',
+      ),
+    );
+    $item->save();
+
+    $job->requestTranslation();
+    $this->refreshVariables();
+
+    // Load fake gengo response and simulate the that the title job
+    // gets translated.
+    $data = variable_get('tmgmt_mygengo_test_last_gengo_response');
+    $key = $job->tjid . '][' . $item->tjiid . '][title';
+    $data->jobs[$key]->status = 'approved';
+    $data->jobs[$key]->body_tgt = 'Title translated';
+    variable_set('tmgmt_mygengo_test_last_gengo_response', $data);
+
+    // Poll jobs from gengo.
+    $this->drupalPost('admin/config/regional/tmgmt/jobs/' . $job->tjid, array(), t('Poll translations'));
+    $this->assertText(t('All available translations from Gengo have been polled.'));
+
+    // Reload item data.
+    entity_get_controller('tmgmt_job_item')->resetCache();
+    $item = tmgmt_job_item_load($item->tjiid);
+    $item_data = $item->getData();
+
+    // Title should be translated by now.
+    $this->assertEqual($item_data['title']['#translation']['#text'], 'Title translated');
+    $this->assertEqual($item_data['title']['#status'], TMGMT_DATA_ITEM_STATE_TRANSLATED);
+    // Body should be untouched.
+    $this->assertTrue(empty($item_data['body']['#translation']));
+    $this->assertEqual($item_data['body']['#status'], TMGMT_DATA_ITEM_STATE_PENDING);
+  }
 }

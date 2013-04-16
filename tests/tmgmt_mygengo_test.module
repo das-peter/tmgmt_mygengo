@@ -9,6 +9,11 @@
  * Implements hook_menu().
  */
 function tmgmt_mygengo_test_menu() {
+  $items['tmgmt_mygengo_mock/v2/translate/jobs/%'] = array(
+    'page callback' => 'tmgmt_mygengo_test_service_jobs_get',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE,
+  );
   $items['tmgmt_mygengo_mock/v2/translate/job/%/comment'] = array(
     'page callback' => 'tmgmt_mygengo_test_service_comment_create',
     'page arguments' => array(4),
@@ -37,6 +42,16 @@ function tmgmt_mygengo_test_menu() {
     'access callback' => TRUE,
   );
   return $items;
+}
+
+/**
+ * Mock service to return previously submitted jobs.
+ */
+function tmgmt_mygengo_test_service_jobs_get() {
+  drupal_json_output(array(
+    'opstat' => 'ok',
+    'response' => variable_get('tmgmt_mygengo_test_last_gengo_response'),
+  ));
 }
 
 /**
