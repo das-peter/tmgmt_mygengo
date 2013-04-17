@@ -36,7 +36,7 @@ function tmgmt_mygengo_test_menu() {
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
-  $items['tmgmt_mygengo_mock/v2/translate/service/language_pairs'] = array(
+  $items['tmgmt_mygengo_mock/v2/translate/service/languages'] = array(
     'page callback' => 'tmgmt_mygengo_test_service_get_languages',
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
@@ -117,13 +117,13 @@ function tmgmt_mygengo_test_service_get_languages() {
 
   $languages = array(
     'de' => array(
-      'lc_tgt' => 'de',
+      'lc' => 'de',
     ),
     'en' => array(
-      'lc_tgt' => 'en',
+      'lc' => 'en',
     ),
     'es' => array(
-      'lc_tgt' => 'es',
+      'lc' => 'es',
     ),
   );
 

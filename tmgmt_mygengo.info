@@ -8,4 +8,5 @@ test_dependencies[] = tmgmt_ui
 test_dependencies[] = views_bulk_operations
 files[] = tmgmt_mygengo.plugin.inc
 files[] = tmgmt_mygengo.ui.inc
+files[] = tmgmt_mygengo.connector.inc
 files[] = tmgmt_mygengo.test

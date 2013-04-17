@@ -10,28 +10,6 @@
  */
 class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController implements TMGMTTranslatorRejectDataItem {
 
-  public $debug = FALSE;
-
-  /**
-   * Translation service URL.
-   *
-   * @var string
-   */
-  protected $apiURL = 'http://api.gengo.com';
-
-  /**
-   * Translation sandbox service URL.
-   * @var string
-   */
-  protected $sandboxURL = 'http://api.sandbox.gengo.com';
-
-  /**
-   * Translation service API version.
-   *
-   * @var string
-   */
-  protected $apiVersion = 'v2';
-
   /**
    * Tels the send job logic to send the job item only with single data item.
    *
@@ -40,22 +18,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   protected $singleDataItemKey;
 
   /**
-   * Internal mock service URL used by tests.
-   *
-   * @var string
-   */
-  public $mockServiceURL = 'tmgmt_mygengo_mock';
-
-  /**
    * If set it will be sent by job post action as a comment.
    *
    * @var string
    */
   protected $serviceComment;
 
-  protected $gengoLanguagePairs = array();
 
-
+  /**
+   * Implements TMGMTDefaultTranslatorPluginController::getDefaultRemoteLanguagesMappings().
+   */
   public function getDefaultRemoteLanguagesMappings() {
     return array(
       'zh-hans' => 'zh',
@@ -70,33 +42,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    */
   public function setServiceComment($comment) {
     $this->serviceComment = check_plain(trim($comment));
-  }
-
-  /**
-   * Builds and gets the service url.
-   *
-   * @param TMGMTTranslator $translator
-   *
-   * @return string
-   *   Service url.
-   */
-  public function getServiceUrl(TMGMTTranslator $translator) {
-
-    // Allow to override the service url for test purpose.
-    if ($translator->getSetting('gengo_service_url') != NULL) {
-      return $translator->getSetting('gengo_service_url') . '/' . $this->apiVersion;
-    }
-
-    $url = NULL;
-
-    if ($translator->getSetting('use_sandbox')) {
-      $url = $this->sandboxURL . '/' . $this->apiVersion;
-    }
-    else {
-      $url = $this->apiURL . '/' . $this->apiVersion;
-    }
-
-    return $url;
   }
 
   /**
@@ -137,98 +82,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Builds, signs and fires a request to Gengo's API.
-   *
-   * Authentication rituals are documented here:
-   * http://developers.gengo.com/v2/authentication/
-   *
-   * It should be noted that the authentication ritual listed there is
-   * different from the one here (v1 vs v1.1, respectively). v1.1 doesn't
-   * require signing on the entire data structure, just a timestamp and keys.
-   *
-   * @param TMGMTTranslator $translator
-   * @param string $endpoint
-   *   Resource path.
-   * @param $method
-   *   HTTP method (GET, POST...)
-   * @param array $data
-   *   Data to send to gengo service.
-   *
-   * @return object
-   *   Response object from gengo.
-   *
-   * @throws TMGMTException
-   */
-  public function requestFromGengo(TMGMTTranslator $translator, $endpoint, $method, $data = array()) {
-    $options = array(
-      'headers' => array(
-        'User-Agent' => 'Drupal Gengo Translation Interface v0.1',
-        'Accept' => 'application/json'
-      ),
-      'method' => $method,
-    );
-
-    $timestamp = gmdate('U');
-
-    $url = $this->getServiceUrl($translator) . '/' . $endpoint;
-
-    if ($method == 'GET' || $method == 'DELETE') {
-      $query = array_merge(array(
-        'api_key' => $translator->getSetting('api_public_key'),
-        'api_sig' => hash_hmac('sha1', $timestamp, $translator->getSetting('api_private_key')),
-        'ts' => $timestamp
-      ), $data);
-
-      $url = url($url, array('query' => $query, 'absolute' => TRUE));
-      $response = drupal_http_request($url, $options);
-    }
-    else {
-      $options['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
-      $options['data'] = drupal_http_build_query(array(
-        'api_key' => $translator->getSetting('api_public_key'),
-        'api_sig' => hash_hmac('sha1', $timestamp, $translator->getSetting('api_private_key')),
-        'ts' => $timestamp,
-        'data' => json_encode($data)
-      ));
-
-      $url = url($url, array('absolute' => TRUE));
-      $response = drupal_http_request($url, $options);
-    }
-
-    if ($this->debug == TRUE) {
-      watchdog('tmgmt_mygengo', "Sending request to gengo at @url with data @data\n\nResponse: @response", array(
-        '@url' => $url,
-        '@data' => var_export($options, TRUE),
-        '@response' => var_export($response, TRUE),
-      ), WATCHDOG_DEBUG);
-    }
-
-    if ($response->code != 200 && $response->code != 201) {
-      throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
-        array('@error' => $response->error, '@url' => $url));
-    }
-
-    $results = json_decode($response->data);
-
-    if ($results->opstat == 'ok' && isset($results->response)) {
-      return $results->response;
-    }
-
-    // Find if we have only one error or multiple.
-    if (isset($results->err->code)) {
-      $gengo_err = $results->err;
-    }
-    // In case of multiple, take only the first one - they are usually the same.
-    // @todo Handle multiple errors received from gengo.
-    else {
-      $gengo_err = reset($results->err);
-      $gengo_err = array_shift($gengo_err);
-    }
-
-    throw new TMGMTException('<strong>#@code @error</strong>', array('@error' => $gengo_err->msg, '@code' => $gengo_err->code));
-  }
-
-  /**
    * Implements TMGMTTranslatorPluginControllerInterface::isAvailable().
    */
   public function isAvailable(TMGMTTranslator $translator) {
@@ -252,12 +105,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         $this->setServiceComment($job->settings['comment']);
       }
 
-      $response = $this->gengoSendJob($job);
-
-      if ($this->debug) {
-        watchdog('tmgmt_mygengo', 'Job submitted. Received response: @response',
-          array('@response' => var_export($response, TRUE)), WATCHDOG_DEBUG);
-      }
+      $response = $this->sendJob($job);
 
       // If we already receive jobs, process them.
       if (!empty($response->jobs)) {
@@ -270,81 +118,9 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       $job->submitted(t('Job has been submitted.'));
     }
     catch (TMGMTException $e) {
-      watchdog_exception('tmgmt', $e);
-      $job->rejected('Job has been rejected with following error: !error',
-        array('!error' => $e->getMessage()), 'error');
-    }
-  }
-
-  protected function processGengoJobsUponTranslationRequest(TMGMTJob $job, $response_jobs) {
-
-    $mappings = array();
-
-    foreach ($response_jobs as $key => $response_job) {
-
-      // Duplicate content has been submitted.
-      if (isset($response_job->duplicate)) {
-        // @todo We need to handle duplicates in some way as client will not
-        //   receive translation for this item.
-        continue;
-      }
-
-      // For machine translations the job is not wrapped in another object
-      // however for human translations it is. So try to cope with this
-      // gengo system variety.
-      if (!isset($response_job->custom_data)) {
-        $response_job = reset($response_job);
-      }
-
-      // In case we receive an existing translation the array offset IS also
-      // the data kay, and we ought to use it as the object custom data is not
-      // updated. However this is not always the case and in some case we
-      // receive numeric keys, so try to set some custom data to increase the
-      // chance of matching the job.
-      if (is_numeric($key)) {
-        $key = $response_job->custom_data;
-      }
-
-      $this->saveTranslation($job, array_slice(tmgmt_ensure_keys_array($key), 1), $response_job);
-
-      $mappings[] = array(
-        'tjid' => $job->tjid,
-        // Yes, this is not a joke, they really return string value "NULL" in
-        // case of a machine translation.
-        'gjid' => $response_job->job_id == 'NULL' ? 0 : $response_job->job_id,
-        'data_item_key' => tmgmt_ensure_keys_string($key),
-      );
-    }
-
-    // For jobs received upon submission we create gengo mappings differently
-    // than in case of regular translation cycle.
-    $this->saveGengoMappings($mappings);
-  }
-
-  /**
-   * Receives and stores a translation returned by Gengo.
-   */
-  public function saveTranslation(TMGMTJob $job, $keys, $data) {
-    if ($data->status == 'approved') {
-      $keys = tmgmt_ensure_keys_array($keys);
-      $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
-
-      // Look for duplicated strings that were saved with a mapping to this key.
-      // @todo Allow additional conditions in TmgmtJob::getRemoteMappings()?
-      $query = new EntityFieldQuery();
-      $query->entityCondition('entity_type', 'tmgmt_remote');
-      $query->propertyCondition('tjid', $job->tjid);
-      $query->propertyCondition('remote_identifier_1', tmgmt_ensure_keys_string($keys));
-
-      $result = $query->execute();
-
-      if (isset($result['tmgmt_remote'])) {
-        $remote_mappings = entity_load('tmgmt_remote', array_keys($result['tmgmt_remote']));
-        // If we found any mappings, also add the translation for those.
-        foreach ($remote_mappings as $remote_mapping) {
-          $job->addTranslatedData(array('#text' => $data->body_tgt), $remote_mapping->data_item_key);
-        }
-      }
+      watchdog_exception('tmgmt_mygengo', $e);
+      $job->rejected('Job has been rejected with following error: @error',
+        array('@error' => $e->getMessage()), 'error');
     }
   }
 
@@ -357,55 +133,17 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     }
 
     try {
-      $languages = $this->requestFromGengo($translator, 'translate/service/languages', 'GET');
-      foreach($languages as $gengo_language) {
+      $connector = new TMGMTGengoConnector($translator);
+      foreach($connector->getLanguages() as $gengo_language) {
         $this->supportedRemoteLanguages[$gengo_language->lc] = $gengo_language->lc;
       }
     }
     catch (TMGMTException $e) {
       watchdog_exception('tmgmt', $e);
+      drupal_set_message($e->getMessage(), 'error');
     }
 
     return $this->supportedRemoteLanguages;
-  }
-
-  /**
-   * Gets gengo language pairs.
-   *
-   * @param TMGMTTranslator $translator
-   *   Translator plugin.
-   * @param $source_language
-   *   Source language code.
-   * @param $target_language
-   *   Target language code.
-   *
-   * @return array
-   */
-  public function getGengoLanguagePairs(TMGMTTranslator $translator, $source_language, $target_language = NULL) {
-    try {
-      if (empty($this->gengoLanguagePairs[$source_language])) {
-        $this->gengoLanguagePairs[$source_language] = $this->requestFromGengo($translator, 'translate/service/language_pairs',
-          'GET', array('lc_src' => $this->mapToRemoteLanguage($translator, $source_language)));
-      }
-    }
-    catch (TMGMTException $e) {
-      watchdog_exception('tmgmt', $e);
-    }
-
-    // If target language provided, filter out all other langs.
-    if (!empty($target_language)) {
-      $lang_pairs = array();
-
-      foreach ($this->gengoLanguagePairs[$source_language] as $lang_pair) {
-        if ($lang_pair->lc_tgt == $this->mapToRemoteLanguage($translator, $target_language)) {
-          $lang_pairs[] = $lang_pair;
-        }
-      }
-
-      return $lang_pairs;
-    }
-
-    return $this->gengoLanguagePairs[$source_language];
   }
 
   /**
@@ -414,136 +152,18 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function getSupportedTargetLanguages(TMGMTTranslator $translator, $source_language) {
     $results = array();
 
-    foreach ($this->getGengoLanguagePairs($translator, $source_language) as $target) {
-      $results[$target->lc_tgt] = $target->lc_tgt;
+    $connector = new TMGMTGengoConnector($translator);
+    $response = $connector->getLanguages($translator->mapToRemoteLanguage($source_language));
+    foreach ($response as $target) {
+      $results[$translator->mapToLocalLanguage($target->lc)] = $translator->mapToLocalLanguage($target->lc);
     }
 
     return $results;
   }
 
   /**
-   * Get a quote from Gengo for the given job.
-   *
-   * @param TMGMTJob $job
-   *   Job for which to get a quote.
-   *
-   * @return array
-   *   Array with the following keys: currency, estimates, highest_eta,
-   *   sum_credits, sum_eta, sum_word_count, and unit_price.
-   * @throws TMGMTException
-   *   In case of error doing request to gengo service.
+   * Implements TMGMTDefaultTranslatorPluginController::canTranslate().
    */
-  public function getQuote(TMGMTJob $job) {
-    $response = $this->gengoSendJob($job, TRUE);
-
-    if ($this->debug) {
-      watchdog('tmgmt_mygengo', 'Job Quote submitted. Received response: @response',
-        array('@response' => var_export($response, TRUE)), WATCHDOG_DEBUG);
-    }
-
-    // Setup empty values
-    $quote = array(
-      'currency' => '',
-      'estimated' => FALSE,
-      'highest_eta' => 0,
-      'sum_credits' => 0,
-      'sum_word_count' => 0,
-    );
-
-    if (!empty($response->jobs)) {
-      $jobs = (array) $response->jobs;
-
-      $quote['currency'] = reset($jobs)->currency;
-
-      // Sum up quotes from each job.
-      foreach ($response->jobs as $job) {
-        $quote['sum_word_count'] += $job->unit_count;
-        $quote['sum_credits'] += $job->credits;
-
-        if ($job->eta > $quote['highest_eta']) {
-          $quote['highest_eta'] = $job->eta;
-        }
-      }
-    }
-
-    return $quote;
-  }
-
-  /**
-   * Pulls remaining credit info from the gengo service.
-   *
-   * @param TMGMTJob $job
-   *
-   * @return string
-   */
-  public function getRemainingCredit(TMGMTJob $job) {
-    try {
-      $response = $this->requestFromGengo($job->getTranslator(), 'account/balance', 'GET');
-      return $response->credits;
-    }
-    catch (TMGMTException $e) {
-      return t('error');
-    }
-  }
-
-  /**
-   * Posts new comment to gengo service.
-   *
-   * @param TMGMTTranslator $translator
-   *   Translator plugin.
-   * @param int $gengo_job_id
-   *   Gengo job id to which to submit comment
-   * @param string $comment
-   *   Comment text.
-   */
-  function gengoPostComment(TMGMTTranslator $translator, $gengo_job_id, $comment) {
-    $this->requestFromGengo($translator, 'translate/job/' . $gengo_job_id . '/comment', 'POST', array('body' => $comment));
-  }
-
-  /**
-   * Fetches comments from gengo service.
-   *
-   * @param TMGMTTranslator $translator
-   *   Translator plugin.
-   * @param $gengo_job_id
-   *   Gengo job id for which to fetch comments.
-   * @param boolean $reload
-   *   Flag to reload cache.
-   *
-   * @return array
-   */
-  function gengoFetchComments(TMGMTTranslator $translator, $gengo_job_id, $reload = FALSE) {
-
-    $cid = 'tmgmt_mygengo_comments_' . $gengo_job_id;
-    $cache = cache_get($cid, 'cache_tmgmt');
-
-    if (isset($cache->data) && !$reload && $cache->expire > REQUEST_TIME) {
-      return $cache->data;
-    }
-
-    $response = $this->requestFromGengo($translator, 'translate/job/' . $gengo_job_id . '/comments', 'GET');
-    $data = isset($response->thread) ? $response->thread : NULL;
-
-    cache_set($cid, $data, 'cache_tmgmt', REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
-
-    return $data;
-  }
-
-  /**
-   * Fetches gengo job from the gengo service.
-   *
-   * @param TMGMTTranslator $translator
-   *   Translator plugin.
-   * @param $gengo_job_id
-   *   External job id.
-   *
-   * @return array
-   *   Request array returned by requestFromGengo().
-   */
-  protected function gengoFetchJob(TMGMTTranslator $translator, $gengo_job_id) {
-    return $this->requestFromGengo($translator, 'translate/job/' . $gengo_job_id, 'GET');
-  }
-
   public function canTranslate(TMGMTTranslator $translator, TMGMTJob $job) {
 
     $target_lang = $this->mapToRemoteLanguage($translator, $job->target_language);
@@ -553,26 +173,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       return TRUE;
     }
     return FALSE;
-  }
-
-  /**
-   * Approves job at gengo side.
-   *
-   * @param TMGMTTranslator $translator
-   *   Translator plugin.
-   * @param $gengo_job_id
-   *   External job id.
-   * @param array $data
-   *   Data to be submitted to gengo services.
-   *
-   * @return array
-   *   Request array returned by requestFromGengo().
-   */
-  protected function gengoApproveJob(TMGMTTranslator $translator, $gengo_job_id, $data = array()) {
-
-    $data += array('action' => 'approve');
-
-    return $this->requestFromGengo($translator, 'translate/job/' . $gengo_job_id, 'PUT', $data);
   }
 
   /**
@@ -587,7 +187,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    *   - Array of job objects returned from gengo.
    *   - Status object with order info.
    */
-  public function gengoSendJob(TMGMTJob $job, $quote_only = FALSE) {
+  public function sendJob(TMGMTJob $job, $quote_only = FALSE) {
     $data = tmgmt_flatten_data($job->getData());
 
     $translations = array();
@@ -650,13 +250,108 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       }
     }
 
-    $url = $quote_only ? 'translate/service/quote' : 'translate/jobs';
-    return $this->requestFromGengo($job->getTranslator(), $url, 'POST', array(
-      'jobs' => $translations,
-      // In case we send one job item as group we will get error from Gengo.
-      'as_group' => (int) (count($translations) > 1),
-    ));
+    $connector = new TMGMTGengoConnector($job->getTranslator());
+    if ($quote_only) {
+      return $connector->getQuote($translations);
+    }
+    else {
+      return $connector->submitJob($translations);
+    }
   }
+
+  /**
+   * Receives and stores a translation returned by Gengo.
+   *
+   * @param TMGMTJob $job
+   *   Job for which to receive translations.
+   * @param array $keys
+   *   Data keys for data item which will be updated with translation.
+   * @param array $data
+   *   Translated data received from gengo.
+   */
+  public function saveTranslation(TMGMTJob $job, $keys, $data) {
+    if ($data->status == 'approved') {
+      $keys = tmgmt_ensure_keys_array($keys);
+      $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
+
+      // Look for duplicated strings that were saved with a mapping to this key.
+      // @todo Allow additional conditions in TmgmtJob::getRemoteMappings()?
+      $query = new EntityFieldQuery();
+      $query->entityCondition('entity_type', 'tmgmt_remote');
+      $query->propertyCondition('tjid', $job->tjid);
+      $query->propertyCondition('remote_identifier_1', tmgmt_ensure_keys_string($keys));
+
+      $result = $query->execute();
+
+      if (isset($result['tmgmt_remote'])) {
+        $remote_mappings = entity_load('tmgmt_remote', array_keys($result['tmgmt_remote']));
+        // If we found any mappings, also add the translation for those.
+        foreach ($remote_mappings as $remote_mapping) {
+          $job->addTranslatedData(array('#text' => $data->body_tgt), $remote_mapping->data_item_key);
+        }
+      }
+    }
+  }
+
+  /**
+   * Will process remote jobs upon translation request.
+   *
+   * This deals with following:
+   *   - Creates mappings of local data items to remote gengo jobs.
+   *   - Saves translation in case it has been already received.
+   *   - Deals with duplicate translations.
+   *
+   * @param TMGMTJob $job
+   *   Local job that is going to be processed.
+   * @param array $response_jobs
+   *   List of gengo jobs received.
+   */
+  protected function processGengoJobsUponTranslationRequest(TMGMTJob $job, $response_jobs) {
+
+    $mappings = array();
+
+    foreach ($response_jobs as $key => $response_job) {
+
+      // Duplicate content has been submitted.
+      if (isset($response_job->duplicate)) {
+        // @todo We need to handle duplicates in some way as client will not
+        //   receive translation for this item.
+        continue;
+      }
+
+      // For machine translations the job is not wrapped in another object
+      // however for human translations it is. So try to cope with this
+      // gengo system variety.
+      if (!isset($response_job->custom_data)) {
+        $response_job = reset($response_job);
+      }
+
+      // In case we receive an existing translation the array offset IS also
+      // the data kay, and we ought to use it as the object custom data is not
+      // updated. However this is not always the case and in some case we
+      // receive numeric keys, so try to set some custom data to increase the
+      // chance of matching the job.
+      if (is_numeric($key)) {
+        $key = $response_job->custom_data;
+      }
+
+      $this->saveTranslation($job, array_slice(tmgmt_ensure_keys_array($key), 1), $response_job);
+
+      $mappings[] = array(
+        'tjid' => $job->tjid,
+        // Yes, this is not a joke, they really return string value "NULL" in
+        // case of a machine translation.
+        'gjid' => $response_job->job_id == 'NULL' ? 0 : $response_job->job_id,
+        'data_item_key' => tmgmt_ensure_keys_string($key),
+      );
+    }
+
+    // For jobs received upon submission we create gengo mappings differently
+    // than in case of regular translation cycle.
+    $this->saveGengoMappings($mappings);
+  }
+
+  ///// Mappings - will be removed/refactored
 
   /**
    * Saves mapping with tmgmt data item and gengo job.
@@ -710,36 +405,44 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function mapGengoJobs(TMGMTJob $job) {
 
     // Search for placeholder item.
-    $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m', array('gorder_id'));
+    $select = db_select('tmgmt_mygengo_mappings', 'm');
+    $select->fields('m', array('gorder_id'));
     $select->condition('tjid', $job->tjid);
     $select->condition('gjid', '');
 
+    $connector = new TMGMTGengoConnector($job->getTranslator());
+
     // If we have a placeholder we want to fetch gengo job ids.
     if ($gorder_id = $select->execute()->fetchField()) {
-      $request = $this->requestFromGengo($job->getTranslator(), 'translate/order/' . $gorder_id, 'GET');
 
-      if ($this->debug) {
-        watchdog('tmgmt_mygengo', 'Fetching order info. Received response: @response',
-          array('@response' => var_export($request, TRUE)), WATCHDOG_DEBUG);
+      $response = NULL;
+
+      try {
+        $response = $connector->getOrder($gorder_id);
+      }
+      catch (TMGMTException $e) {
+        watchdog_exception('tmgmt_mygengo', $e);
+        drupal_set_message($e->getMessage(), 'error');
+        return;
       }
 
       // If all the jobs are not yet in Gengo's system, do nothing.
-      if($request->order->jobs_queued != 0){
+      if($response->order->jobs_queued != 0){
         return;
       }
 
       $gengo_job_ids = array();
-      if (!empty($request->order->jobs_available)) {
-        $gengo_job_ids += $request->order->jobs_available;
+      if (!empty($response->order->jobs_available)) {
+        $gengo_job_ids += $response->order->jobs_available;
       }
-      if (!empty($request->order->jobs_pending)) {
-        $gengo_job_ids += $request->order->jobs_pending;
+      if (!empty($response->order->jobs_pending)) {
+        $gengo_job_ids += $response->order->jobs_pending;
       }
-      if (!empty($request->order->jobs_reviewable)) {
-        $gengo_job_ids += $request->order->jobs_reviewable;
+      if (!empty($response->order->jobs_reviewable)) {
+        $gengo_job_ids += $response->order->jobs_reviewable;
       }
-      if (!empty($request->order->jobs_approved)) {
-        $gengo_job_ids += $request->order->jobs_approved;
+      if (!empty($response->order->jobs_approved)) {
+        $gengo_job_ids += $response->order->jobs_approved;
       }
 
       // Remove the placeholder record and insert actual
@@ -757,35 +460,12 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       $this->saveGengoMappings($mappings);
     }
 
-    // Now load all Gengo job ids and try to get mapping data.
-    $gjids = $this->getGengoJobIds($job->tjid);
-    $response = NULL;
-
-    // We have fetch mapping data.
-    $response = $this->requestFromGengo($job->getTranslator(),
-        'translate/jobs/' . implode(',', $gjids), 'GET');
-
-    if ($this->debug) {
-      watchdog('tmgmt_mygengo', 'Mapping gengo jobs. tjid: @tjid gjids: @gjids. Received response: @response',
-        array(
-          '@tjid' => $job->tjid,
-          '@gjids' => implode(', ', $gjids),
-          '@response' => var_export($response, TRUE)
-        ), WATCHDOG_DEBUG);
-    }
+    // Get gengo jobs for existing gengo job ids.
+    $response = $connector->getJobs($this->getGengoJobIds($job->tjid));
 
     // Gengo did not provide any mapping data, do nothing.
     // This only happens in the case that Gengo is unreachable.
     if (empty($response->jobs)) {
-
-      if ($this->debug) {
-        watchdog('tmgmt_mygengo', 'Mapping gengo jobs. tjid: @tjid gjids: @gjids. Received response: @response',
-          array(
-            '@tjid' => $job->tjid,
-            '@gjids' => implode(', ', $gjids),
-            '@response' => var_export($response, TRUE)
-          ), WATCHDOG_DEBUG);
-      }
       return;
     }
 

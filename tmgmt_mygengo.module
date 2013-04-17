@@ -55,16 +55,15 @@ function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
   /* @var TMGMTJobItem $item */
   $item = $form_state['item'];
   $job = $item->getJob();
-  /* @var TMGMTMyGengoTranslatorPluginController $plugin */
-  $plugin = $job->getTranslatorController();
 
   try {
-    $plugin->gengoPostComment($job->getTranslator(), $gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
+    $connector = new TMGMTGengoConnector($job->getTranslator());
+    $connector->postComment($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
     $form_state['comment_submitted'] = 1;
   }
   catch (TMGMTException $e) {
     watchdog_exception('tmgmt_mygengo', $e);
-    drupal_set_message(t('Unable to add comment.'), 'error');
+    drupal_set_message(t('Unable to add comment. Error: !error', array('!error' => $e->getMessage())), 'error');
   }
 }
 
@@ -144,24 +143,29 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
   // Get all available mappings.
   $gengo_mappings = $controller->getMappedGengoData($job->tjid);
 
+  $connector = new TMGMTGengoConnector($job->getTranslator());
   $response = NULL;
   // Get Translations for mapped data.
-  if (!empty($gengo_mappings)) {
-    $response = $controller->requestFromGengo($job->getTranslator(), 'translate/jobs/' . implode(',', array_keys($gengo_mappings)), 'GET');
+  if (empty($gengo_mappings)) {
+    drupal_set_message(t('Gengo service has not yet queued the jobs. Please try again later.'));
+    return;
   }
 
-  if (!empty($response->jobs)) {
-    foreach ($response->jobs as $response_job) {
-      $controller->saveTranslation($job, $gengo_mappings[$response_job->job_id]->data_item_key, $response_job);
+  try {
+    $response = $connector->getJobs(array_keys($gengo_mappings));
+    if (!empty($response->jobs)) {
+      foreach ($response->jobs as $response_job) {
+        $controller->saveTranslation($job, $gengo_mappings[$response_job->job_id]->data_item_key, $response_job);
+      }
+
+      drupal_set_message(t('All available translations from Gengo have been polled.'));
     }
+  }
+  catch (TMGMTException $e) {
+    watchdog_exception('tmgmt_mygengo', $e);
+    drupal_set_message($e->getMessage(), 'error');
+  }
 
-    drupal_set_message(t('All available translations from Gengo have been polled.'));
-  }
-  else {
-    drupal_set_message(t('myGengo did not provide any translations.'));
-    watchdog('tmgmt_mygengo', 'Error polling translations from Gengo with response @response',
-      array('@response' => var_export($response, TRUE)), WATCHDOG_WARNING);
-  }
 }
 
 /**

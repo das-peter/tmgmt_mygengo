@@ -96,14 +96,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       );
 
       $reload_comments = !empty($form_state['comment_submitted']) ? $form_state['comment_submitted'] : FALSE;
-
-      try {
-        $thread = $plugin->gengoFetchComments($job->getTranslator(), $gengo_job_id, $reload_comments);
-      }
-      catch (TMGMTException $e) {
-        watchdog_exception('tmgmt_mygengo', $e);
-        $thread = NULL;
-      }
+      $thread = $this->fetchComments($job->getTranslator(), $gengo_job_id, $reload_comments);
 
       $form['review'][$gengo_job_id . '_comments']['comments_wrapper']['comments'] = array(
         '#type' => 'markup',
@@ -176,10 +169,6 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
    * Overrides TMGMTDefaultTranslatorUIController::checkoutSettingsForm().
    */
   public function checkoutSettingsForm($form, &$form_state, TMGMTJob $job) {
-    /**
-     * @var TMGMTMyGengoTranslatorPluginController $plugin
-     */
-    $plugin = tmgmt_translator_plugin_controller($this->pluginType);
     $translator = $job->getTranslator();
 
     // Set the quality setting from submitted vals - we need this for quote as
@@ -193,38 +182,10 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       $job->settings['quality'] = 'standard';
     }
 
-    $tier_names = array(
-      'machine' => t('Machine'),
-      'standard' => t('Standard'),
-      'pro' => t('Business'),
-      'ultra' => t('Ultra'),
-    );
-
-    $available_tiers = array();
-    // Machine translation is always available.
-    $available_tiers['machine'] = $tier_names['machine'];
-
-    // Build quality options based on returned language pairs data. This
-    // approach will filter out tiers that are not supported for current
-    // source/target lang pair.
-    $gengo_language_pairs = $plugin->getGengoLanguagePairs($translator, $job->source_language, $job->target_language);
-    foreach ($gengo_language_pairs as $tier) {
-      $available_tiers[$tier->tier] = t('@tier (@cost @currency per word)', array(
-        '@tier' => empty($tier_names[$tier->tier]) ? $tier->tier : $tier_names[$tier->tier],
-        '@cost' => number_format($tier->unit_price, 2),
-        '@currency' => $tier->currency,
-      ));
-    }
-
-    // Gengo service does not support ultra quality for grouped jobs and we
-    // send all jobs as grouped. We need to wait until gengo will support
-    // grouped jobs for ultra quality as well.
-    unset($available_tiers['ultra']);
-
     $settings['quality'] = array(
       '#type' => 'select',
       '#title' => t('Quality'),
-      '#options' => $available_tiers,
+      '#options' => $this->getAvailableTiersOptions($job),
       '#default_value' => $job->settings['quality'],
       '#description' => t('Choose the level of quality for this translation job.'),
       '#ajax' => array(
@@ -237,49 +198,36 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       return $settings;
     }
 
-    $quote = array();
-
-    try {
-      $quote = $plugin->getQuote($job);
-    }
-    catch (TMGMTException $e) {
-      $err_msg = t('Unable to get a quote from Gengo with error: !error', array('!error' => $e->getMessage()));
-    }
+    $quote = $this->getQuoteInfo($job);
+    $credit_info = $this->getRemainingCreditInfo($translator);
 
     $settings['quote'] = array(
       '#type' => 'fieldset',
       '#title' => t('Quote'),
     );
 
-    if (!empty($err_msg)) {
-      $settings['quote']['error_msg'] = array(
-        '#markup' => '<div class="messages error">' . $err_msg . '</div>'
+    $settings['quote']['word_count'] = array(
+      '#type' => 'item',
+      '#title' => t('Word count'),
+      '#markup' => isset($quote['sum_word_count']) ? $quote['sum_word_count'] : t('unknown'),
+    );
+    $settings['quote']['needed_credits'] = array(
+      '#type' => 'item',
+      '#title' => t('Needed Credits'),
+      '#markup' => number_format($quote['sum_credits'], 2) . ' ' . $quote['currency'],
+    );
+    if ($translator->getSetting('show_remaining_credits_info')) {
+      $settings['quote']['remaining_credits'] = array(
+        '#type' => 'item',
+        '#title' => t('Remaining Credits'),
+        '#markup' => $credit_info['credits'],
       );
     }
-    else {
-      $settings['quote']['word_count'] = array(
-        '#type' => 'item',
-        '#title' => t('Word count'),
-        '#markup' => isset($quote['sum_word_count']) ? $quote['sum_word_count'] : t('unknown'),
-      );
-      $settings['quote']['needed_credits'] = array(
-        '#type' => 'item',
-        '#title' => t('Needed Credits'),
-        '#markup' => number_format($quote['sum_credits'], 2) . ' ' . $quote['currency'],
-      );
-      if ($translator->getSetting('show_remaining_credits_info')) {
-        $settings['quote']['remaining_credits'] = array(
-          '#type' => 'item',
-          '#title' => t('Remaining Credits'),
-          '#markup' => $plugin->getRemainingCredit($job),
-        );
-      }
-      $settings['quote']['eta'] = array(
-        '#type' => 'item',
-        '#title' => t('ETA'),
-        '#markup' => format_date(time() + $quote['highest_eta'], "long"),
-      );
-    }
+    $settings['quote']['eta'] = array(
+      '#type' => 'item',
+      '#title' => t('ETA'),
+      '#markup' => format_date(time() + $quote['highest_eta'], "long"),
+    );
 
     $settings['comment'] = array(
       '#type' => 'textarea',
@@ -307,5 +255,182 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     }
 
     return $form;
+  }
+
+  /**
+   * Get a quote from Gengo for the given job.
+   *
+   * @param TMGMTJob $job
+   *   Job for which to get a quote.
+   *
+   * @return array
+   *   Array with the following keys: currency, estimates, highest_eta,
+   *   sum_credits, sum_eta, sum_word_count, and unit_price.
+   * @throws TMGMTException
+   *   In case of error doing request to gengo service.
+   */
+  protected function getQuoteInfo(TMGMTJob $job) {
+    $response = NULL;
+    /* @var TMGMTMyGengoTranslatorPluginController $plugin */
+    $plugin = $job->getTranslatorController();
+
+    try {
+      $response = $plugin->sendJob($job, TRUE);
+    }
+    catch (TMGMTException $e) {
+      watchdog_exception('tmgmt_mygengo', $e);
+      drupal_set_message($e->getMessage(), 'error');
+    }
+
+    // Setup empty values
+    $quote = array(
+      'currency' => '',
+      'estimated' => FALSE,
+      'highest_eta' => 0,
+      'sum_credits' => 0,
+      'sum_word_count' => 0,
+    );
+
+    if (!empty($response->jobs)) {
+      $jobs = (array) $response->jobs;
+
+      $quote['currency'] = reset($jobs)->currency;
+
+      // Sum up quotes from each job.
+      foreach ($response->jobs as $job) {
+        $quote['sum_word_count'] += $job->unit_count;
+        $quote['sum_credits'] += $job->credits;
+
+        if ($job->eta > $quote['highest_eta']) {
+          $quote['highest_eta'] = $job->eta;
+        }
+      }
+    }
+
+    return $quote;
+  }
+
+  /**
+   * Gets remaining credit info at gengo account.
+   *
+   * @param TMGMTTranslator $translator
+   *   Translator.
+   *
+   * @return array
+   *   Associative array of currency and credits.
+   */
+  protected function getRemainingCreditInfo(TMGMTTranslator $translator) {
+    $connector = new TMGMTGengoConnector($translator);
+    $credit_info = array(
+      'credits' => NULL,
+      'currency' => NULL,
+    );
+    try {
+      $response = $connector->getRemainingCredit();
+      $credit_info['credits'] = $response->credits;
+    }
+    catch (TMGMTException $e) {
+      watchdog_exception('tmgmt_mygengo', $e);
+      drupal_set_message($e->getMessage(), 'error');
+    }
+
+    return $credit_info;
+  }
+
+  /**
+   * Builds quality/tier options for src/tgt language pair of the job.
+   *
+   * @param TMGMTJob $job
+   *   Translation job.
+   *
+   * @return array
+   *   Associative array of tiers with info.
+   */
+  protected function getAvailableTiersOptions(TMGMTJob $job) {
+
+    $translator = $job->getTranslator();
+
+    $tier_names = array(
+      'machine' => t('Machine'),
+      'standard' => t('Standard'),
+      'pro' => t('Business'),
+      'ultra' => t('Ultra'),
+      'nonprofit' => t('Nonprofit'),
+    );
+
+    $available_tiers = array();
+    // Machine translation is always available.
+    $available_tiers['machine'] = $tier_names['machine'];
+
+    $connector = new TMGMTGengoConnector($translator);
+    $gengo_language_pairs = array();
+
+    try {
+      $gengo_language_pairs = $connector->getLanguagePairs($translator);
+    }
+    catch (TMGMTException $e) {
+      watchdog_exception('tmgmt_mygengo', $e);
+      drupal_set_message($e->getMessage(), 'error');
+    }
+
+    foreach ($gengo_language_pairs as $tier) {
+      // Skip if for other language pairs.
+      if ($tier->lc_src != $translator->mapToRemoteLanguage($job->source_language) || $tier->lc_tgt != $translator->mapToLocalLanguage($job->target_language)) {
+        continue;
+      }
+
+      $available_tiers[$tier->tier] = t('@tier (@cost @currency per word)', array(
+        '@tier' => empty($tier_names[$tier->tier]) ? $tier->tier : $tier_names[$tier->tier],
+        '@cost' => number_format($tier->unit_price, 2),
+        '@currency' => $tier->currency,
+      ));
+    }
+
+    // @todo Gengo service does not support ultra quality for grouped jobs
+    // and we send all jobs as grouped. We need to wait until gengo will support
+    // grouped jobs for ultra quality as well.
+    if (isset($available_tiers['ultra'])) {
+      unset($available_tiers['ultra']);
+    }
+
+    return $available_tiers;
+  }
+
+  /**
+   * Fetches comments from gengo service.
+   *
+   * @param TMGMTTranslator $translator
+   *   Translator plugin.
+   * @param $gengo_job_id
+   *   Gengo job id for which to fetch comments.
+   * @param boolean $reload
+   *   Flag to reload cache.
+   *
+   * @return array
+   */
+  function fetchComments(TMGMTTranslator $translator, $gengo_job_id, $reload = FALSE) {
+
+    $cid = 'tmgmt_mygengo_comments_' . $gengo_job_id;
+    $cache = cache_get($cid, 'cache_tmgmt');
+
+    if (isset($cache->data) && !$reload && $cache->expire > REQUEST_TIME) {
+      return $cache->data;
+    }
+
+    $connector = new TMGMTGengoConnector($translator);
+    $response = NULL;
+
+    try {
+      $response = $connector->getComments($gengo_job_id);
+
+      $data = isset($response->thread) ? $response->thread : NULL;
+      cache_set($cid, $data, 'cache_tmgmt', REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
+      return $data;
+    }
+    catch (TMGMTException $e) {
+      drupal_set_message($e->getMessage(), 'error');
+      watchdog_exception('tmgmt_mygengo', $e);
+      return array();
+    }
   }
 }

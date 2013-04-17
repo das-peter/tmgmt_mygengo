@@ -26,23 +26,10 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     );
   }
 
-  /**
-   * Overrides SimplenewsTestCase::setUp()
-   */
   function setUp() {
     parent::setUp(array('tmgmt_ui', 'tmgmt_mygengo', 'tmgmt_mygengo_test'));
-
     $this->translator = tmgmt_translator_load('mygengo');
-
-    /**
-     * @var TMGMTMyGengoTranslatorPluginController $plugin
-     */
-    $plugin = $this->translator->getController();
-    // Save implicit value for gengo_service_url to be used during tests.
-    $this->translator->settings = array(
-      'gengo_service_url' => $plugin->mockServiceURL,
-    );
-    $this->translator->save();
+    variable_set('tmgmt_mygengo_use_mock_service', TRUE);
   }
 
   /**
@@ -225,7 +212,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertText('Hello world');
     $this->assertText('mt_de_Hello world');
 
-    $this->drupalPost('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), '✗');
+    $this->drupalPost('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), '?');
 
     $item_wrapper_key = 'wrapper][subwrapper';
     // Test if we have correct confirm text.
