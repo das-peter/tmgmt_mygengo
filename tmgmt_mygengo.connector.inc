@@ -253,7 +253,7 @@ class TMGMTGengoConnector {
   protected function request($path, $method, $data = array()) {
     $options = array(
       'headers' => array(
-        'User-Agent' => 'Drupal Gengo Translation Interface v0.1',
+        'User-Agent' => $this->getUserAgent(),
         'Accept' => 'application/json'
       ),
       'method' => $method,
@@ -326,5 +326,24 @@ class TMGMTGengoConnector {
     }
 
     throw new TMGMTException(t('Gengo service returned error #@code @error'), array('@error' => $gengo_err->msg, '@code' => $gengo_err->code));
+  }
+
+
+  /**
+   * Builds user agent info.
+   *
+   * @return string
+   *   The user agent being.
+   */
+  function getUserAgent() {
+    global $base_url;
+
+    $info = system_get_info('module', 'tmgmt');
+    $tmgmt_version = !empty($info['version']) ? $info['version'] : $info['core'] . '-1.x-dev';
+
+    $info = system_get_info('module', 'tmgmt_mygengo');
+    $gengo_version = !empty($info['version']) ? $info['version'] : $info['core'] . '-1.x-dev';
+
+    return 'Drupal TMGMT/' . $tmgmt_version . '; Gengo/' . $gengo_version . '; ' . $base_url;
   }
 }
