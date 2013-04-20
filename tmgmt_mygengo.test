@@ -176,6 +176,12 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $no_label_key = $job->tjid . '][' . $item->tjiid . '][no_label';
     $this->assertEqual($jobs[$subwrapper1_key]->slug, 'Parent label > Sub label 1');
     $this->assertEqual($jobs[$no_label_key]->slug, 'No label');
+
+    // Test positions.
+    $position = 0;
+    foreach ($jobs as $response_job) {
+      $this->assertEqual($position++, $response_job->position);
+    }
   }
 
   function testJobItemRejection() {

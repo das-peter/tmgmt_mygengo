@@ -164,18 +164,18 @@ function tmgmt_mygengo_test_service_translate() {
       // Machine translation - simulate returning translation job right away.
       if ($job->tier == 'machine') {
         $body_tgt = 'mt_de_' . $job->body_src;
-        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'approved', $job->tier, $job->custom_data, $job->slug);
+        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'approved', $job->tier, $job->custom_data, $job->slug, $job->position);
       }
       // Hack to tell mock service that translation should be returned right
       // away as available.
       elseif (strpos($job->body_src, 'Lazy-Loading') !== FALSE) {
         $body_tgt = str_replace('Lazy-Loading', 'Translated', $job->body_src);
-        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'available', $job->tier, $job->custom_data, $job->slug);
+        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'available', $job->tier, $job->custom_data, $job->slug, $job->position);
       }
       // Otherwise we have submitted a job, however just return the job object
       // without translation and in pending state.
       else {
-        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, NULL, 'pending', $job->tier, $job->custom_data, $job->slug);
+        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, NULL, 'pending', $job->tier, $job->custom_data, $job->slug, $job->position);
       }
     }
 
@@ -194,7 +194,7 @@ function tmgmt_mygengo_test_service_translate() {
 /**
  * Helper function to build gengo job.
  */
-function tmgmt_mygengo_test_build_response_job($body_src, $body_tgt, $status, $tier, $custom_data, $slug) {
+function tmgmt_mygengo_test_build_response_job($body_src, $body_tgt, $status, $tier, $custom_data, $slug, $position = 0) {
 
   $job = new stdClass();
   $job->lc_src = 'en';
@@ -209,6 +209,7 @@ function tmgmt_mygengo_test_build_response_job($body_src, $body_tgt, $status, $t
   $job->slug = $slug;
   $job->job_id = rand(1, 100);
   $job->status = NULL;
+  $job->position = $position;
 
   if (!empty($body_tgt)) {
     $job->status = 'approved';

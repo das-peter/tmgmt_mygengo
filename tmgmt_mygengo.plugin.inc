@@ -193,6 +193,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
     $translations = array();
 
     $sources = array();
+    $position = 0;
 
     foreach ($data as $key => $value) {
       if (isset($value['#translate']) && $value['#translate'] === FALSE) {
@@ -236,6 +237,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         'custom_data' => $job->tjid . '][' . $key,
         'auto_approve' => (int) $job->getTranslator()->getSetting('mygengo_auto_approve'),
         'use_preferred' => (int) $job->getTranslator()->getSetting('use_preferred'),
+        'position' => $position++,
       );
 
       if (!empty($this->serviceComment)) {
