@@ -28,6 +28,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
   function setUp() {
     parent::setUp(array('tmgmt_ui', 'tmgmt_mygengo', 'tmgmt_mygengo_test'));
+    $this->setEnvironment('de');
     $this->translator = tmgmt_translator_load('mygengo');
     variable_set('tmgmt_mygengo_use_mock_service', TRUE);
   }
@@ -449,5 +450,52 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // Body should be untouched.
     $this->assertTrue(empty($item_data['body']['#translation']));
     $this->assertEqual($item_data['body']['#status'], TMGMT_DATA_ITEM_STATE_PENDING);
+  }
+
+  function testGengoCheckoutForm() {
+    $this->loginAsAdmin();
+
+    $this->translator->settings['api_public_key'] = 'correct key';
+    $this->translator->settings['api_private_key'] = 'correct key';
+    $this->translator->save();
+    $job = $this->createJob();
+    $job->settings['quality'] = 'standard';
+    $job->translator = $this->translator->name;
+    $job->save();
+    $item = $job->addItem('test_source', 'test', '1');
+    $item->data = array(
+      'title' => array(
+        '#text' => 'Hello world',
+        '#label' => 'Title',
+      ),
+      'body' => array(
+        '#text' => 'This is some testing content',
+        '#label' => 'Body',
+      ),
+    );
+    $item->save();
+
+    $this->drupalGet('admin/config/regional/tmgmt/jobs/' . $job->tjid);
+    $needed_credits = $this->xpath('//div[@id=:id]', array(':id' => 'edit-settings-quote-needed-credits'));
+    // The quote service returns two jobs each worth 2.
+    $this->assertTrue(strpos($needed_credits[0]->asXML(), '4') !== FALSE);
+
+    $word_count = $this->xpath('//div[@id=:id]', array(':id' => 'edit-settings-quote-word-count'));
+    // The quote service returns two jobs each having 2 words.
+    $this->assertTrue(strpos($word_count[0]->asXML(), '4') !== FALSE);
+
+    $remaining_credit = $this->xpath('//div[@id=:id]', array(':id' => 'edit-settings-quote-remaining-credits'));
+    // The account balance service returns static value of 25.32 USD
+    $this->assertTrue(strpos($remaining_credit[0]->asXML(), '25.32 USD') !== FALSE);
+
+    $eta = $this->xpath('//div[@id=:id]', array(':id' => 'edit-settings-quote-eta'));
+    // The quote service returns ETA of now + one day.
+    $out = $eta[0]->asXML();
+    // Check both cases to prevent case when we are here at the minute border
+    // and one second ahead of the page render.
+    $check_1 = strpos($out, format_date(time() + 60*60*24, "long")) !== FALSE;
+    $check_2 = strpos($out, format_date((time() + 60*60*24) - 1, "long")) !== FALSE;
+    $this->assertTrue($check_1 || $check_2);
+
   }
 }

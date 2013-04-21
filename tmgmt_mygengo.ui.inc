@@ -314,7 +314,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       $settings['quote']['remaining_credits'] = array(
         '#type' => 'item',
         '#title' => t('Remaining Credits'),
-        '#markup' => $credit_info['credits'],
+        '#markup' => $credit_info['credits'] . ' ' . $credit_info['currency'],
       );
     }
     $settings['quote']['eta'] = array(
@@ -422,6 +422,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     try {
       $response = $connector->getRemainingCredit();
       $credit_info['credits'] = $response->credits;
+      $credit_info['currency'] = $response->currency;
     }
     catch (TMGMTException $e) {
       watchdog_exception('tmgmt_mygengo', $e);

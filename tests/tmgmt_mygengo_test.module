@@ -47,6 +47,16 @@ function tmgmt_mygengo_test_menu() {
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
+  $items['tmgmt_mygengo_mock/v2/translate/service/language_pairs'] = array(
+    'page callback' => 'tmgmt_mygengo_test_service_get_language_pairs',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE,
+  );
+  $items['tmgmt_mygengo_mock/v2/translate/service/quote'] = array(
+    'page callback' => 'tmgmt_mygengo_test_service_get_quote',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE,
+  );
   return $items;
 }
 
@@ -140,6 +150,7 @@ function tmgmt_mygengo_test_service_comments_get($gengo_job_id) {
 function tmgmt_mygengo_test_service_account_balance() {
   $balance = new stdClass();
   $balance->credits = 25.32;
+  $balance->currency = 'USD';
   drupal_json_output(array(
     'opstat' => 'ok',
     'response' => $balance,
@@ -169,6 +180,66 @@ function tmgmt_mygengo_test_service_get_languages() {
   drupal_json_output(array(
     'opstat' => 'ok',
     'response' => $languages,
+  ));
+}
+
+/**
+ * Page callback for getting language pairs.
+ */
+function tmgmt_mygengo_test_service_get_language_pairs() {
+
+  $pairs = array();
+
+  $pair = new stdClass();
+  $pair->lc_src = 'en';
+  $pair->lc_tgt = 'de';
+  $pair->tier = 'standard';
+  $pair->unit_price = '0.0500';
+  $pair->currency = 'USD';
+  $pairs[] = $pair;
+
+  $pair->tier = 'pro';
+  $pair->unit_price = '0.1000';
+  $pairs[] = $pair;
+
+  $pair->tier = 'ultra';
+  $pair->unit_price = '0.1500';
+  $pairs[] = $pair;
+
+  drupal_json_output(array(
+    'opstat' => 'ok',
+    'response' => $pairs,
+  ));
+}
+
+/**
+ * Page callback for getting a jobs quote.
+ *
+ * Note that this mock service returns just static info. There is no logic
+ * that would somehow react on what has been submitted as job data.
+ */
+function tmgmt_mygengo_test_service_get_quote() {
+
+  $quote = new stdClass();
+  $quote->jobs = array();
+
+  $quote->jobs[0] = new stdClass();
+  $quote->jobs[0]->unit_count = 2;
+  $quote->jobs[0]->credits = 2;
+  $quote->jobs[0]->eta = 60*60*24; // One day.
+  $quote->jobs[0]->type = 'text';
+  $quote->jobs[0]->currency = 'USD';
+
+  $quote->jobs[1] = new stdClass();
+  $quote->jobs[1]->unit_count = 2;
+  $quote->jobs[1]->credits = 2;
+  $quote->jobs[1]->eta = 60*60*24; // One day.
+  $quote->jobs[1]->type = 'text';
+  $quote->jobs[1]->currency = 'USD';
+
+  drupal_json_output(array(
+    'opstat' => 'ok',
+    'response' => $quote,
   ));
 }
 
