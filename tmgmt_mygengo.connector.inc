@@ -195,6 +195,21 @@ class TMGMTGengoConnector {
   }
 
   /**
+   * Submits a job for revision.
+   *
+   * @param int $gengo_job_id
+   * @param string $comment
+   *
+   * @return object
+   */
+  function reviseJob($gengo_job_id, $comment) {
+    return $this->put('translate/job/' . $gengo_job_id, array(
+      'action' => 'revise',
+      'comment' => $comment,
+    ));
+  }
+
+  /**
    * Get request to gengo service.
    *
    * @param string $path
@@ -262,13 +277,13 @@ class TMGMTGengoConnector {
     $timestamp = gmdate('U');
 
     if (variable_get('tmgmt_mygengo_use_mock_service', FALSE)) {
-      $url = $GLOBALS['base_url'] . '/tmgmt_mygengo_mock' . '/' . self::API_VERSION . '/' . $path;;
+      $url = $GLOBALS['base_url'] . '/tmgmt_mygengo_mock' . '/' . self::API_VERSION . '/' . $path;
     }
     elseif ($this->useSandbox) {
-      $url = self::SANDBOX_URL . '/' . self::API_VERSION . '/' . $path;;
+      $url = self::SANDBOX_URL . '/' . self::API_VERSION . '/' . $path;
     }
     else {
-      $url = self::PRODUCTION_URL . '/' . self::API_VERSION . '/' . $path;;
+      $url = self::PRODUCTION_URL . '/' . self::API_VERSION . '/' . $path;
     }
 
     if ($method == 'GET' || $method == 'DELETE') {

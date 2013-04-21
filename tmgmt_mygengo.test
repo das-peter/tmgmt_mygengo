@@ -184,84 +184,6 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     }
   }
 
-  function testJobItemRejection() {
-
-    $this->loginAsAdmin();
-
-    // Make sure we have correct keys.
-    $this->translator->settings['api_public_key'] = 'correct key';
-    $this->translator->settings['api_private_key'] = 'correct key';
-
-    $this->translator->save();
-
-    $job = $this->createJob();
-    $job->settings['quality'] = 'machine';
-    $job->translator = $this->translator->name;
-    $job->save();
-    $item = $job->addItem('test_source', 'test', '1');
-    $item->data = array(
-      'wrapper' => array(
-        '#label' => 'Parent label',
-        'subwrapper' => array(
-          '#text' => 'Hello world',
-          '#label' => 'Sub label 1',
-        ),
-      ),
-    );
-    $item->save();
-
-    $job->requestTranslation();
-
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
-
-    // Make sure we got the review tool with source and translation texts.
-    $this->assertText('Hello world');
-    $this->assertText('mt_de_Hello world');
-
-    $this->drupalPost('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), '?');
-
-    $item_wrapper_key = 'wrapper][subwrapper';
-    // Test if we have correct confirm text.
-    $this->assertText(t('Confirm rejection of @data_item in @job_item', array(
-      '@data_item' => $item->getData(tmgmt_ensure_keys_array($item_wrapper_key), '#label'),
-      '@job_item' => $item->label(),
-    )));
-
-    // Submit current page.
-    $this->drupalPost(NULL, NULL, t('Confirm'));
-
-    $this->assertText($item->defaultLabel());
-
-    // Navigate to the review tool and check if the data item is pending.
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
-    $xpath = $this->xpath('//tr[@id="tmgmt-ui-element-wrapper-subwrapper"]/td[1]/div[@class="tmgmt-ui-state"]');
-    $state_icon = array_shift($xpath);
-    $this->assertEqual($state_icon->div['title'], t('Pending'));
-
-    // Create a gengo response of translated and approved job that will be
-    // sent as reviewed translation of previously rejected data item.
-    $post['job'] = json_encode(tmgmt_mygengo_test_build_response_job(
-      'Hello world',
-      'Hallo Welt reviewed',
-      'approved',
-      'standard',
-      implode('][', array($job->tjid, $item->tjiid, $item_wrapper_key)),
-      $item->data['wrapper']['#label']
-    ));
-
-    $action = url('tmgmt_mygengo_callback', array('absolute' => TRUE));
-    $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
-
-    // Response should be empty if everything went ok.
-    $this->assertResponse(200);
-    $this->assertTrue(empty($out));
-
-    // See if we have source and translation texts populated correctly.
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
-    $this->assertText('Hello world');
-    $this->assertText('Hallo Welt reviewed');
-  }
-
   function testAvailableStatus() {
     $this->loginAsAdmin();
 
@@ -401,7 +323,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->translator->settings['api_private_key'] = 'correct key';
     $this->translator->save();
     $job = $this->createJob();
-    $job->settings['quality'] = 'machine';
+    $job->settings['quality'] = 'standard';
     $job->translator = $this->translator->name;
     $job->save();
     $item = $job->addItem('test_source', 'test', '1');
@@ -445,11 +367,35 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
       }
     }
 
-    // Post comment - this must be possible if mappings are correct.
+    $this->drupalPostAJAX('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), array($mapping->gjid . '_comment_form' => '✉'));
+    $this->assertText(t('New comment'));
     $comment = $this->randomName();
-    $this->drupalPostAJAX('admin/config/regional/tmgmt/items/' . $item->tjiid,
-      array($mapping->gjid . '_comment' => $comment), $mapping->gjid . '_submit');
+    $this->drupalPostAJAX(NULL, array($mapping->gjid . '_comment' => $comment), array($mapping->gjid . '_submit' => t('Submit comment')));
 
+    // Reload the review form again and check if comment text is present.
+    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
+    $this->assertText($comment);
+
+    // Put first data item (Title "Nice day") into translated status so we can
+    // request a revision.
+    /* @var TMGMTMyGengoTranslatorPluginController $plugin */
+    $plugin = $job->getTranslatorController();
+    $data = new stdClass();
+    $data->status = 'reviewable';
+    $data->body_tgt = 'Nice day translated';
+    $key = tmgmt_ensure_keys_array($mapping->data_item_key);
+    array_shift($key);
+    $plugin->saveTranslation($job, $key, $data);
+
+    // Request a review.
+    $comment = $this->randomName();
+    $this->drupalPostAJAX('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), array($mapping->gjid . '_revision_form' => '✍'));
+    $this->drupalPostAJAX(NULL, array($mapping->gjid . '_comment' => $comment), array($mapping->gjid . '_submit' => t('Request revision')));
+
+    $job = tmgmt_job_load($job->tjid);
+    $data = $job->getData($key);
+    // Test the data item status - should be back to pending.
+    $this->assertEqual($data[$item->tjiid]['#status'], TMGMT_DATA_ITEM_STATE_PENDING);
     // Reload the review form again and check if comment text is present.
     $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
     $this->assertText($comment);

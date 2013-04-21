@@ -9,6 +9,12 @@
  * Implements hook_menu().
  */
 function tmgmt_mygengo_test_menu() {
+  $items['tmgmt_mygengo_mock/v2/translate/job/%'] = array(
+    'page callback' => 'tmgmt_mygengo_test_service_job',
+    'page arguments' => array(4),
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE,
+  );
   $items['tmgmt_mygengo_mock/v2/translate/jobs/%'] = array(
     'page callback' => 'tmgmt_mygengo_test_service_jobs_get',
     'type' => MENU_CALLBACK,
@@ -42,6 +48,36 @@ function tmgmt_mygengo_test_menu() {
     'access callback' => TRUE,
   );
   return $items;
+}
+
+/**
+ * Mock service - Job PUT - used for job review.
+ *
+ * @param int $gengo_job_id
+ *   Gengo job id.
+ */
+function tmgmt_mygengo_test_service_job($gengo_job_id) {
+  $data = array();
+  parse_str(file_get_contents('php://input'), $data);
+
+  $data = drupal_json_decode($data['data']);
+
+  if ($data['action'] == 'revise') {
+
+    $comment = new stdClass();
+    $comment->body = $data['comment'];
+    $comment->ctime = REQUEST_TIME;
+    $comment->author = 'yogi bear';
+
+    $comments = variable_get('tmgmt_mygengo_test_comments', array());
+    $comments[$gengo_job_id][] = $comment;
+    variable_set('tmgmt_mygengo_test_comments', $comments);
+  }
+
+  drupal_json_output(array(
+    'opstat' => 'ok',
+    'response' => '',
+  ));
 }
 
 /**

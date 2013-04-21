@@ -1,8 +1,5 @@
-div.input-wrapper {
-  display: none;
-}
 
-div.comments-pane {
+div.gengo-pane {
   margin-bottom: 10px;
 }
 
@@ -24,7 +21,9 @@ div.gengo-comment-body {
   margin: 10px 0 0;
 }
 
-input.new-comment-button {
-  font-size: 18px !important;
-  padding: 2px 16px !important;
+div.form-wrapper input.gengo-button {
+  font-size: 18px;
+  padding: 2px 15px;
+  margin-bottom: .8em;
+  margin-right: .8em;
 }

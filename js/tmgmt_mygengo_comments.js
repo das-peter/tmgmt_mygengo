@@ -3,35 +3,26 @@
   Drupal.behaviors.tmgmt_mygengo = {
     attach: function (context, settings) {
 
-      $('input.new-comment-button').click(function() {
-        var classes = $(this).attr('class').split(' ');
-        $(classes).each(function() {
-          if (this.indexOf('gengo-id') > 0) {
-            var gengoId = this.replace('-gengo-id', '');
-            $("#" + gengoId + "-input-wrapper").slideDown();
-            $("#" + gengoId + "-input-wrapper textarea").focus();
-          }
-        });
-        return false;
-      });
+      var $gengoIdField = $('input:hidden[name=submitted_comment_gengo_id]');
+      var $gengoAction = $('input:hidden[name=submitted_gengo_action]').val();
+      var $ajaxId = $('input:hidden[name=ajaxid]').val();
 
-      $('input.cancel-comment-button').click(function() {
-        var classes = $(this).attr('class').split(' ');
-        $(classes).each(function() {
-          if (this.indexOf('gengo-id') > 0) {
-            var gengoId = this.replace('-gengo-id', '');
-            $("#" + gengoId + "-input-wrapper").slideUp();
-          }
-        });
-        return false;
-      });
-
-      var gengoId = $('input:hidden[name=submitted_comment_gengo_id]').val();
+      var gengoId = $gengoIdField.val();
       if (gengoId) {
         $('html, body').animate({
           scrollTop: $("#" + gengoId + "-comments-list-closing").offset().top - 200
         }, 200);
-        $("#" + gengoId + "-input-wrapper").hide();
+
+        $gengoIdField.val('');
+        if ($gengoAction == 'revision') {
+          var $icon = $('#' + $ajaxId + ' div.tmgmt-ui-icon');
+          $icon.removeClass('tmgmt-ui-icon-yellow');
+          $icon.removeClass('tmgmt-ui-state-translated');
+          $icon.addClass('tmgmt-ui-icon-grey');
+          $icon.addClass('tmgmt-ui-state-pending');
+          $icon.html('<span></span>');
+          $('input.' + gengoId + '-gengo-id').hide();
+        }
       }
     }
   };

@@ -26,6 +26,8 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       array_shift($key_array);
       // Remove tjjid.
       array_shift($key_array);
+      // Store data item key for further use.
+      $info->key_array = $key_array;
       // Create key which is used in the review form.
       $key = str_replace('][', '|', implode('|', $key_array));
       // Add into mapping data array.
@@ -46,72 +48,164 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       }
 
       $gengo_job_id = $mapping_data[$form_key]->gjid;
+      $data_item = $item->getData($mapping_data[$form_key]->key_array);
 
-      $form['review'][$key][$form_key]['actions']['comment'] = array(
-        '#type' => 'button',
-        '#value' => '✉',
-        '#attributes' => array('title' => t('Add new comment'), 'class' => array( $gengo_job_id . '-gengo-id', 'new-comment-button')),
-      );
+      if ($data_item['#status'] == TMGMT_DATA_ITEM_STATE_REVIEWED || $data_item['#status'] == TMGMT_DATA_ITEM_STATE_PENDING) {
+        $form['review'][$key][$form_key]['actions'][$gengo_job_id . '_comment_form'] = array(
+          '#type' => 'submit',
+          '#value' => '✉',
+          '#attributes' => array('title' => t('Add new comment'), 'class' => array( $gengo_job_id . '-gengo-id', 'new-comment-button', 'gengo-button')),
+          '#submit' => array('tmgmt_mygengo_gengo_action_form_submit'),
+          '#name' => $gengo_job_id . '_comment_form',
+          '#gengo_action' => 'comment',
+          '#gengo_job_id' => $gengo_job_id,
+          '#ajax' => array(
+            'callback' => 'tmgmt_mygengo_review_form_input_pane_ajax',
+            'wrapper' => $gengo_job_id . '-input-wrapper',
+          ),
+        );
+      }
+
+      if ($data_item['#status'] == TMGMT_DATA_ITEM_STATE_TRANSLATED) {
+        $form['review'][$key][$form_key]['actions'][$gengo_job_id . '_revision_form'] = array(
+          '#type' => 'submit',
+          '#value' => '✍',
+          '#name' => $gengo_job_id . '_revision_form',
+          '#attributes' => array('title' => t('Request new revision'), 'class' => array( $gengo_job_id . '-gengo-id', 'request-revision-button', 'gengo-button')),
+          '#submit' => array('tmgmt_mygengo_gengo_action_form_submit'),
+          '#gengo_action' => 'revision',
+          '#gengo_job_id' => $gengo_job_id,
+          '#ajax' => array(
+            'callback' => 'tmgmt_mygengo_review_form_input_pane_ajax',
+            'wrapper' => $gengo_job_id . '-input-wrapper',
+          ),
+        );
+      }
 
       $form['review'][$key]['#weight'] = $i++;
 
-      $form['review'][$gengo_job_id . '_comments'] = array(
-        '#prefix' => '<div class="comments-pane" id="' . $gengo_job_id . '-comments-pane">',
+      $form['review'][$gengo_job_id . '_gengo'] = array(
+        '#prefix' => '<div class="gengo-pane" id="' . $gengo_job_id . '-gengo-pane">',
         '#suffix' => '</div>',
         '#weight' => $i++,
       );
 
       // Input pane.
-      $form['review'][$gengo_job_id . '_comments']['input_wrapper'] = array(
+      $form['review'][$gengo_job_id . '_gengo']['input_wrapper'] = array(
         '#prefix' => '<div class="input-wrapper" id="' . $gengo_job_id . '-input-wrapper">',
         '#suffix' => '</div>',
       );
-      $form['review'][$gengo_job_id . '_comments']['input_wrapper'][$gengo_job_id . '_comment'] = array(
-        '#type' => 'textarea',
-        '#title' => t('New comment'),
-      );
-      $form['review'][$gengo_job_id . '_comments']['input_wrapper'][$gengo_job_id . '_submit'] = array(
-        '#type' => 'submit',
-        '#name' => $gengo_job_id . '_submit',
-        '#value' => t('Submit comment'),
-        '#validate' => array('tmgmt_mygengo_add_comment_form_validate'),
-        '#submit' => array('tmgmt_mygengo_add_comment_form_submit'),
-        '#gengo_job_id' => $gengo_job_id,
-        '#ajax' => array(
-          'callback' => 'tmgmt_mygengo_review_form_ajax',
-          'wrapper' => $gengo_job_id . '-comments-wrapper',
-        ),
-      );
-      $form['review'][$gengo_job_id . '_comments']['input_wrapper'][$gengo_job_id . '_cancel'] = array(
-        '#type' => 'button',
-        '#value' => t('Cancel'),
-        '#attributes' => array('class' => array( $gengo_job_id . '-gengo-id', 'cancel-comment-button')),
-      );
+
+      if (!empty($form_state['active_gengo_job_id']) && $form_state['active_gengo_job_id'] == $gengo_job_id) {
+        $form['review'][$gengo_job_id . '_gengo']['input_wrapper'] += $this->getCommentForm($gengo_job_id, $form_state['gengo_action'], $mapping_data[$form_key]);
+      }
       // Input pane end.
 
       // Comments pane.
-      $form['review'][$gengo_job_id . '_comments']['comments_wrapper'] = array(
+      $form['review'][$gengo_job_id . '_gengo']['comments_wrapper'] = array(
         '#prefix' => '<div class="comments-wrapper" id="' . $gengo_job_id . '-comments-wrapper">',
         '#suffix' => '</div>',
       );
 
-      $reload_comments = !empty($form_state['comment_submitted']) ? $form_state['comment_submitted'] : FALSE;
-      $thread = $this->fetchComments($job->getTranslator(), $gengo_job_id, $reload_comments);
+      $thread = $this->fetchComments($job->getTranslator(), $gengo_job_id, !empty($form_state['submitted_gengo_action']));
 
-      $form['review'][$gengo_job_id . '_comments']['comments_wrapper']['comments'] = array(
+      $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['comments'] = array(
         '#type' => 'markup',
         '#markup' => theme('tmgmt_mygengo_comments_thread', array('thread' => $thread, 'gengo_job_id' => $gengo_job_id)),
         '#tree' => FALSE,
       );
 
-      if (!empty($form_state['comment_submitted'])) {
-        $form['review'][$gengo_job_id . '_comments']['comments_wrapper']['submitted_comment_gengo_id'] = array(
+      if (!empty($form_state['submitted_gengo_action'])) {
+        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_comment_gengo_id'] = array(
           '#type' => 'hidden',
           '#value' => $gengo_job_id,
+        );
+        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_gengo_action'] = array(
+          '#type' => 'hidden',
+          '#value' => $form_state['submitted_gengo_action'],
+        );
+        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['ajaxid'] = array(
+          '#type' => 'hidden',
+          // We strip the --n increment as we are targeting element which is not
+          // ajax reloaded, therefore its id attribute will not change.
+          '#value' => substr($form['review'][$key][$form_key]['#ajaxid'], 0, strpos($form['review'][$key][$form_key]['#ajaxid'], '--')),
         );
       }
       // Comments pane end.
     }
+
+    return $form;
+  }
+
+  /**
+   * Builds form comment form based on the action.
+   *
+   * @param int $gengo_job_id
+   *   Gengo job id.
+   * @param $action
+   *   Action requested by user (comment, revision)
+   * @param object $mapping
+   *   Data item mapping object.
+   *
+   * @return array
+   *   Built form array.
+   */
+  protected function getCommentForm($gengo_job_id, $action, $mapping) {
+
+    $submit_base = array(
+      '#type' => 'submit',
+      '#name' => $gengo_job_id . '_submit',
+      '#gengo_job_id' => $gengo_job_id,
+      '#ajax' => array(
+        'callback' => 'tmgmt_mygengo_review_form_gengo_pane_ajax',
+        'wrapper' => $gengo_job_id . '-gengo-pane',
+      ),
+    );
+
+    if ($action == 'revision') {
+      $form[$gengo_job_id . '_comment'] = array(
+        '#type' => 'textarea',
+        '#title' => t('Revision comment'),
+        '#description' => t('Provide instructions for the translator.'),
+      );
+      $form[$gengo_job_id . '_key_array'] = array(
+        '#type' => 'value',
+        '#value' => $mapping->key_array,
+      );
+
+      $form[$gengo_job_id . '_submit_revision'] = $submit_base + array(
+        '#value' => t('Request revision'),
+        // Using same validator as for comment.
+        '#validate' => array('tmgmt_mygengo_add_comment_form_validate'),
+        '#submit' => array('tmgmt_mygengo_add_revision_form_submit'),
+      );
+    }
+    elseif ($action == 'comment') {
+      $form[$gengo_job_id . '_comment'] = array(
+        '#type' => 'textarea',
+        '#title' => t('New comment'),
+      );
+
+      $form[$gengo_job_id . '_submit_comment'] = $submit_base + array(
+        '#value' => t('Submit comment'),
+        '#validate' => array('tmgmt_mygengo_add_comment_form_validate'),
+        '#submit' => array('tmgmt_mygengo_add_comment_form_submit'),
+      );
+    }
+
+    $form[$gengo_job_id . '_cancel'] = array(
+      '#type' => 'submit',
+      '#name' => $gengo_job_id . '_cancel',
+      '#value' => t('Cancel'),
+      '#attributes' => array('class' => array( $gengo_job_id . '-gengo-id', 'cancel-comment-button')),
+      '#submit' => array('tmgmt_mygengo_gengo_cancel_form_submit'),
+      '#gengo_action' => '',
+      '#gengo_job_id' => $gengo_job_id,
+      '#ajax' => array(
+        'callback' => 'tmgmt_mygengo_review_form_input_pane_ajax',
+        'wrapper' => $gengo_job_id . '-input-wrapper',
+      ),
+    );
 
     return $form;
   }
@@ -135,9 +229,9 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     );
     $form['mygengo_auto_approve'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Auto approve'),
+      '#title' => t('Automatically approve jobs at Gengo side.'),
       '#default_value' => $translator->getSetting('mygengo_auto_approve'),
-      '#description' => t('Check to auto approve translated jobs from Gengo. If this setting is off there is a review process available, however each rejection will result in submission of a new job to Gengo service and therefore additional costs.'),
+      '#description' => t('Check to auto approve translated jobs from Gengo. This setting will skip the review process and automatically mark jobs at Gengo side as approved by you.'),
       '#prefix' => '<div class="mygengo-auto-approve">',
       '#suffix' => '</div>',
     );
@@ -145,7 +239,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       '#type' => 'checkbox',
       '#title' => t('Use the sandbox'),
       '#default_value' => $translator->getSetting('use_sandbox'),
-      '#description' => t('Check to use the testing environment. If you use sandbox auto approve has to be turned on as only with this setting you will be able to go through the whole translation workflow.'),
+      '#description' => t('Check to use the testing environment.'),
       '#prefix' => '<div class="mygengo-use-sandbox">',
       '#suffix' => '</div>',
     );

@@ -8,14 +8,7 @@
 /**
  * Gengo translation plugin controller.
  */
-class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController implements TMGMTTranslatorRejectDataItem {
-
-  /**
-   * Tels the send job logic to send the job item only with single data item.
-   *
-   * @var string
-   */
-  protected $singleDataItemKey;
+class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController {
 
   /**
    * If set it will be sent by job post action as a comment.
@@ -42,27 +35,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    */
   public function setServiceComment($comment) {
     $this->serviceComment = check_plain(trim($comment));
-  }
-
-  /**
-   * Implements TMGMTTranslatorRejectDataItem::rejectDataItem()
-   */
-  public function rejectDataItem(TMGMTJobItem $job_item, array $key, array $values = NULL) {
-    $job = $job_item->getJob();
-    $data_item = $job_item->getData($key);
-
-    // Add comment into data item.
-    $this->setServiceComment($values['comment']);
-
-    array_unshift($key, $job_item->tjiid);
-
-    // Request translation for only the rejected data item.
-    $this->singleDataItemKey = implode('][', $key);
-    $this->requestTranslation($job);
-
-    $job_item->addMessage('Job data item %label has been resubmitted to Gengo translate service.', array('%label' => tmgmt_data_item_label($data_item)));
-
-    return TRUE;
   }
 
   /**
@@ -190,19 +162,13 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function sendJob(TMGMTJob $job, $quote_only = FALSE) {
     $data = tmgmt_flatten_data($job->getData());
 
+    $translator = $job->getTranslator();
     $translations = array();
-
     $sources = array();
     $position = 0;
 
     foreach ($data as $key => $value) {
       if (isset($value['#translate']) && $value['#translate'] === FALSE) {
-        continue;
-      }
-
-      // We want to submit the job only with specific job item. Used
-      // in the pseudo-reject workflow.
-      if (!empty($this->singleDataItemKey) && $key != $this->singleDataItemKey) {
         continue;
       }
 
@@ -230,25 +196,20 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         'type' => 'text',
         'slug' => tmgmt_data_item_label($value),
         'body_src' => $value['#text'],
-        'lc_src' => $this->mapToRemoteLanguage($job->getTranslator(), $job->source_language),
-        'lc_tgt' => $this->mapToRemoteLanguage($job->getTranslator(), $job->target_language),
+        'lc_src' => $translator->mapToRemoteLanguage($job->source_language),
+        'lc_tgt' => $translator->mapToRemoteLanguage($job->target_language),
         'tier' => $job->settings['quality'],
         'callback_url' => url('tmgmt_mygengo_callback', array('absolute' => TRUE)),
         'custom_data' => $job->tjid . '][' . $key,
         'auto_approve' => (int) $job->getTranslator()->getSetting('mygengo_auto_approve'),
         'use_preferred' => (int) $job->getTranslator()->getSetting('use_preferred'),
         'position' => $position++,
+        'auto_approve' => (int) $translator->getSetting('mygengo_auto_approve'),
+        'use_preferred' => (int) $translator->getSetting('use_preferred'),
       );
 
       if (!empty($this->serviceComment)) {
         $translations[$job->tjid . '][' . $key]['comment'] = $this->serviceComment;
-      }
-      // If singleDataItemKey is set and we have reached this point we are going
-      // to resubmit an existing data item as a new gengo job item. Therefore
-      // we need to set force flag to create a new gengo job and not to get
-      // existing translation.
-      if (!empty($this->singleDataItemKey)) {
-        $translations[$job->tjid . '][' . $key]['force'] = 1;
       }
     }
 
@@ -272,7 +233,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    *   Translated data received from gengo.
    */
   public function saveTranslation(TMGMTJob $job, $keys, $data) {
-    if ($data->status == 'approved') {
+    if ($data->status == 'approved' || $data->status == 'reviewable') {
       $keys = tmgmt_ensure_keys_array($keys);
       $job->addTranslatedData(array('#text' => $data->body_tgt), $keys);
 

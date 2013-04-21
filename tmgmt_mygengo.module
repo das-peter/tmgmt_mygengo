@@ -29,14 +29,61 @@
 define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
 
 /**
- * Ajax callback for comment form.
+ * Ajax callback for comment pane form in the review tool.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::reviewForm()
  */
-function tmgmt_mygengo_review_form_ajax($form, &$form_state) {
-  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_comments']['comments_wrapper'];
+function tmgmt_mygengo_review_comments_pane_form_ajax($form, &$form_state) {
+  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_gengo']['comments_wrapper'];
+}
+/**
+ * Ajax callback for input pane form part in the review tool.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::reviewForm()
+ */
+function tmgmt_mygengo_review_form_input_pane_ajax($form, &$form_state) {
+  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_gengo']['input_wrapper'];
+}
+/**
+ * Ajax callback for whole gengo pane form part in the review tool.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::reviewForm()
+ */
+function tmgmt_mygengo_review_form_gengo_pane_ajax($form, &$form_state) {
+  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_gengo'];
+}
+
+/**
+ * Gengo action form cancel button submit callback.
+ *
+ * Unsets workflow specific data from $form_state to have the form build in the
+ * initial state.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
+ */
+function tmgmt_mygengo_gengo_cancel_form_submit($form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+  $form_state['gengo_action'] = NULL;
+  $form_state['active_gengo_job_id'] = NULL;
+}
+
+/**
+ * Data item gengo buttons submit callback.
+ *
+ * Based on clicked button will set workflow data into $form_state.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::reviewForm()
+ */
+function tmgmt_mygengo_gengo_action_form_submit($form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+  $form_state['gengo_action'] = $form_state['triggering_element']['#gengo_action'];
+  $form_state['active_gengo_job_id'] = $form_state['triggering_element']['#gengo_job_id'];
 }
 
 /**
  * Validates comment to be sent to gengo service.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
  */
 function tmgmt_mygengo_add_comment_form_validate($form, &$form_state) {
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
@@ -48,9 +95,13 @@ function tmgmt_mygengo_add_comment_form_validate($form, &$form_state) {
 
 /**
  * Submits comment to gengo service.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
  */
 function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
   $form_state['rebuild'] = TRUE;
+  $form_state['gengo_action'] = NULL;
+  $form_state['active_gengo_job_id'] = NULL;
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
   /* @var TMGMTJobItem $item */
   $item = $form_state['item'];
@@ -59,11 +110,45 @@ function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
   try {
     $connector = new TMGMTGengoConnector($job->getTranslator());
     $connector->postComment($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
-    $form_state['comment_submitted'] = 1;
+    $form_state['submitted_gengo_action'] = 'comment';
   }
   catch (TMGMTException $e) {
     watchdog_exception('tmgmt_mygengo', $e);
     drupal_set_message(t('Unable to add comment. Error: !error', array('!error' => $e->getMessage())), 'error');
+  }
+}
+
+/**
+ * Submits a revision to gengo service.
+ *
+ * Upon successful revision submission to gengo it will put the data item into
+ * pending state.
+ *
+ * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
+ */
+function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+  $form_state['gengo_action'] = NULL;
+  $form_state['active_gengo_job_id'] = NULL;
+  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
+  /* @var TMGMTJobItem $item */
+  $item = $form_state['item'];
+  $job = $item->getJob();
+
+  try {
+    $connector = new TMGMTGengoConnector($job->getTranslator());
+    $connector->reviseJob($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
+
+    $data = $item->getData($form_state['values'][$gengo_job_id . '_key_array']);
+    $data['#status'] = TMGMT_DATA_ITEM_STATE_PENDING;
+    $item->updateData($form_state['values'][$gengo_job_id . '_key_array'], $data);
+    $item->save();
+
+    $form_state['submitted_gengo_action'] = 'revision';
+  }
+  catch (TMGMTException $e) {
+    watchdog_exception('tmgmt_mygengo', $e);
+    drupal_set_message(t('Unable to add revision. Error: !error', array('!error' => $e->getMessage())), 'error');
   }
 }
 
@@ -216,7 +301,6 @@ function tmgmt_mygengo_tmgmt_translator_plugin_info() {
       'plugin controller class' => 'TMGMTMyGengoTranslatorPluginController',
       'ui controller class' => 'TMGMTMyGengoTranslatorUIController',
       'default settings' => array(
-        'mygengo_auto_approve' => 1,
         'show_remaining_credits_info' => 1,
       ),
     ),
