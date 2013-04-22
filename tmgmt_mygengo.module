@@ -263,6 +263,10 @@ function tmgmt_mygengo_callback() {
   $tjid = array_shift($keys);
 
   $job = tmgmt_job_load($tjid);
+  if (!$job) {
+    watchdog('tmgmt_mygengo', 'Failed to load translation job for @data', array('@data' => var_export($data, TRUE)));
+    return;
+  }
 
   /**
    * @var TMGMTMyGengoTranslatorPluginController $mygengo
