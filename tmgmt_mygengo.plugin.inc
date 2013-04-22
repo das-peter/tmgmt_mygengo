@@ -201,8 +201,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         'tier' => $job->settings['quality'],
         'callback_url' => url('tmgmt_mygengo_callback', array('absolute' => TRUE)),
         'custom_data' => $job->tjid . '][' . $key,
-        'auto_approve' => (int) $job->getTranslator()->getSetting('mygengo_auto_approve'),
-        'use_preferred' => (int) $job->getTranslator()->getSetting('use_preferred'),
         'position' => $position++,
         'auto_approve' => (int) $translator->getSetting('mygengo_auto_approve'),
         'use_preferred' => (int) $translator->getSetting('use_preferred'),
@@ -367,11 +365,17 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    */
   public function mapGengoJobs(TMGMTJob $job) {
 
+    $select = db_select('tmgmt_mygengo_mappings', 'm');
+    $select->addExpression('COUNT(*)');
+    $select->condition('tjid', $job->tjid);
+    $select->condition('gjid', '0', '>');
+    $mapped_jobs_count = $select->execute()->fetchField();
+
     // Search for placeholder item.
     $select = db_select('tmgmt_mygengo_mappings', 'm');
     $select->fields('m', array('gorder_id'));
     $select->condition('tjid', $job->tjid);
-    $select->condition('gjid', '');
+    $select->condition('gjid', '0');
 
     $connector = new TMGMTGengoConnector($job->getTranslator());
 
@@ -389,8 +393,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         return;
       }
 
-      // If all the jobs are not yet in Gengo's system, do nothing.
-      if($response->order->jobs_queued != 0){
+      // No jobs yet created at Gengo side. Nothing to do.
+      if ($response->order->jobs_queued == $response->order->total_jobs) {
         return;
       }
 
@@ -407,9 +411,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       if (!empty($response->order->jobs_approved)) {
         $gengo_job_ids += $response->order->jobs_approved;
       }
+      if (!empty($response->order->jobs_revising)) {
+        $gengo_job_ids += $response->order->jobs_revising;
+      }
 
-      // Remove the placeholder record and insert actual
-      db_delete('tmgmt_mygengo_mappings')->condition('gorder_id', $gorder_id)->execute();
+      // Remove the placeholder record if we got mappings for all the jobs.
+      if ($mapped_jobs_count == $response->order->total_jobs) {
+        db_delete('tmgmt_mygengo_mappings')->condition('gorder_id', $gorder_id)->execute();
+      }
 
       $mappings = array();
       foreach ($gengo_job_ids as $gengo_job_id) {
@@ -463,6 +472,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   public function getGengoJobIds($tjid) {
     $select = db_select('tmgmt_mygengo_mappings', 'm')->fields('m', array('gjid'));
     $select->condition('tjid', $tjid);
+    $select->condition('gjid', '0', '>');
 
     return $select->execute()->fetchCol();
   }
