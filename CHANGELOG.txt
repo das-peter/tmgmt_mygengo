@@ -1,6 +1,7 @@
 
 TMGMT Translator Gengo 7.x-1.0-beta2, xxxx-xx-xx
 -----------------------
+- Issue #1970570 - Replace custom mapping table with tmgmt remote mapping API.
 - Issue #1870798 - Added support for job reviews and rejections.
 - Issue #1968510 - Provide a connector class, major refactor of translator
   plugin class and UI controller class

@@ -139,10 +139,31 @@ function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
     $connector = new TMGMTGengoConnector($job->getTranslator());
     $connector->reviseJob($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
 
-    $data = $item->getData($form_state['values'][$gengo_job_id . '_key_array']);
-    $data['#status'] = TMGMT_DATA_ITEM_STATE_PENDING;
-    $item->updateData($form_state['values'][$gengo_job_id . '_key_array'], $data);
-    $item->save();
+    $data_item_key = $form_state['values'][$gengo_job_id . '_data_item_key'];
+    $item->updateData($data_item_key, array('#status' => TMGMT_DATA_ITEM_STATE_PENDING));
+
+    $items = array();
+    $items[$item->tjiid] = $item;
+
+    // Check remote mapping for duplicates, update them as well.
+    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($item->tjid, $item->tjiid, $data_item_key);
+    $remote = reset($remotes);
+    if (!empty($remote->remote_data['duplicates'])) {
+      foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
+        list($tjiid, $data_item_key) = explode('][', $duplicate_key, 2);
+        if (!isset($items[$tjiid])) {
+          $items[$tjiid] = tmgmt_job_item_load($tjiid);
+        }
+        if ($items[$tjiid]) {
+          $items[$tjiid]->updateData($data_item_key, array('#status' => TMGMT_DATA_ITEM_STATE_PENDING));
+        }
+      }
+    }
+
+    // Save all updated items.
+    foreach ($items as $item) {
+      $item->save();
+    }
 
     $form_state['submitted_gengo_action'] = 'revision';
   }
@@ -222,58 +243,54 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
    */
   $controller = $job->getTranslator()->getController();
 
-  // Try to map jobs that have not yet been mapped.
-  $controller->mapGengoJobs($job);
-
-  // Get all available mappings.
-  $gengo_mappings = $controller->getMappedGengoData($job->tjid);
-
-  $connector = new TMGMTGengoConnector($job->getTranslator());
-  $response = NULL;
-  // Get Translations for mapped data.
-  if (empty($gengo_mappings)) {
-    drupal_set_message(t('Gengo service has not yet queued the jobs. Please try again later.'));
-    return;
-  }
-
-  try {
-    $response = $connector->getJobs(array_keys($gengo_mappings));
-    if (!empty($response->jobs)) {
-      foreach ($response->jobs as $response_job) {
-        $controller->saveTranslation($job, $gengo_mappings[$response_job->job_id]->data_item_key, $response_job);
-      }
-
-      drupal_set_message(t('All available translations from Gengo have been polled.'));
-    }
-  }
-  catch (TMGMTException $e) {
-    watchdog_exception('tmgmt_mygengo', $e);
-    drupal_set_message($e->getMessage(), 'error');
-  }
-
+  // Fetch everything for this job, this updates the mapping and saves
+  // translations if there are any.
+  $controller->fetchGengoJobs($job);
+  drupal_set_message(t('All available translations from Gengo have been polled.'));
 }
 
 /**
  * Process response from mygengo.
  */
 function tmgmt_mygengo_callback() {
-
   $data = json_decode($_POST['job']);
-  $keys = explode('][', $data->custom_data);
-  $tjid = array_shift($keys);
-
+  list($tjid, $tjiid, $data_item_key) = explode('][', $data->custom_data, 3);
   $job = tmgmt_job_load($tjid);
   if (!$job) {
     watchdog('tmgmt_mygengo', 'Failed to load translation job for @data', array('@data' => var_export($data, TRUE)), WATCHDOG_WARNING);
     return;
   }
 
+  $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($tjid, $tjiid, $data_item_key);
+  $remote = reset($remotes);
+  // Create a mapping for this job if we don't have one yet. Should not happen
+  // as we pre-create mappings with the order id..
+  if (!$remote) {
+    $item = tmgmt_job_item_load($tjiid);
+    $item->addRemoteMapping($data_item_key, NULL, array(
+      'remote_identifier_2' => $data->job_id,
+      'word_count' => $data->unit_count,
+      'remote_data' => array(
+        'credits' => $data->credits,
+        'tier' => $data->tier,
+      ),
+      // @todo: Add remote_url.
+    ));
+  }
+  elseif (empty($remote->remote_identifier_2)) {
+    $remote->remote_identifier_2 = $data->job_id;
+    $remote->word_count = $data->unit_count;
+    $remote->remote_data['credits'] = $data->credits;
+    $remote->remote_data['tier'] = $data->tier;
+    $remote->save();
+  }
+
   /**
    * @var TMGMTMyGengoTranslatorPluginController $mygengo
    */
   $mygengo = $job->getTranslator()->getController();
-  $mygengo->saveTranslation($job, $keys, $data);
-  $mygengo->mapGengoJobs($job);
+  // Prepend the job item id.
+  $mygengo->saveTranslation($job, $tjiid . '][' . $data_item_key, $data);
 
   print '';
 }

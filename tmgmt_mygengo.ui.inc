@@ -16,22 +16,19 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
    */
   public function reviewForm($form, &$form_state, TMGMTJobItem $item) {
     $job = $item->getJob();
-    /* @var TMGMTMyGengoTranslatorPluginController $plugin */
-    $plugin = $job->getTranslatorController();
 
-    $mapping_data = array();
-    foreach ($plugin->getMappedGengoData($job->tjid) as $info) {
-      $key_array = tmgmt_ensure_keys_array($info->data_item_key);
-      // Remove tjid.
-      array_shift($key_array);
-      // Remove tjjid.
-      array_shift($key_array);
-      // Store data item key for further use.
-      $info->key_array = $key_array;
+    $remotes = array();
+    $tmgmt_remote_controller = entity_get_controller('tmgmt_remote');
+    foreach ($tmgmt_remote_controller->loadByLocalData($item->tjid, $item->tjiid) as $remote) {
+      // Ignore remote mappings that do not yet have a Gengo job id.
+      if (empty($remote->remote_identifier_2)) {
+        continue;
+      }
+
       // Create key which is used in the review form.
-      $key = str_replace('][', '|', implode('|', $key_array));
+      $key = str_replace('][', '|', $remote->data_item_key);
       // Add into mapping data array.
-      $mapping_data[$key] = $info;
+      $remotes[$key] = $remote;
     }
 
     $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo_comments.js';
@@ -39,99 +36,100 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
 
     $i = 0;
     foreach (element_children($form['review']) as $key) {
-      $form_keys = element_children($form['review'][$key]);
-      $form_key = array_pop($form_keys);
+      foreach (element_children($form['review'][$key]) as $form_key) {
+        // @todo: Handle duplicates.
 
-      // If we do not have mapping data yet for the data item continue.
-      if (!isset($mapping_data[$form_key])) {
-        continue;
-      }
+        // If we do not have mapping data yet for the data item continue.
+        if (!isset($remotes[$form_key])) {
+          continue;
+        }
 
-      $gengo_job_id = $mapping_data[$form_key]->gjid;
-      $data_item = $item->getData($mapping_data[$form_key]->key_array);
+        $gengo_job_id = $remotes[$form_key]->remote_identifier_2;
+        $data_item = $item->getData(tmgmt_ensure_keys_array($remotes[$form_key]->data_item_key));
 
-      if ($data_item['#status'] == TMGMT_DATA_ITEM_STATE_REVIEWED || $data_item['#status'] == TMGMT_DATA_ITEM_STATE_PENDING) {
-        $form['review'][$key][$form_key]['actions'][$gengo_job_id . '_comment_form'] = array(
-          '#type' => 'submit',
-          '#value' => '✉',
-          '#attributes' => array('title' => t('Add new comment'), 'class' => array( $gengo_job_id . '-gengo-id', 'new-comment-button', 'gengo-button')),
-          '#submit' => array('tmgmt_mygengo_gengo_action_form_submit'),
-          '#name' => $gengo_job_id . '_comment_form',
-          '#gengo_action' => 'comment',
-          '#gengo_job_id' => $gengo_job_id,
-          '#ajax' => array(
-            'callback' => 'tmgmt_mygengo_review_form_input_pane_ajax',
-            'wrapper' => $gengo_job_id . '-input-wrapper',
-          ),
+        if ($data_item['#status'] == TMGMT_DATA_ITEM_STATE_REVIEWED || $data_item['#status'] == TMGMT_DATA_ITEM_STATE_PENDING) {
+          $form['review'][$key][$form_key]['actions'][$gengo_job_id . '_comment_form'] = array(
+            '#type' => 'submit',
+            '#value' => '✉',
+            '#attributes' => array('title' => t('Add new comment'), 'class' => array( $gengo_job_id . '-gengo-id', 'new-comment-button', 'gengo-button')),
+            '#submit' => array('tmgmt_mygengo_gengo_action_form_submit'),
+            '#name' => $gengo_job_id . '_comment_form',
+            '#gengo_action' => 'comment',
+            '#gengo_job_id' => $gengo_job_id,
+            '#ajax' => array(
+              'callback' => 'tmgmt_mygengo_review_form_input_pane_ajax',
+              'wrapper' => $gengo_job_id . '-input-wrapper',
+            ),
+          );
+        }
+
+        if ($data_item['#status'] == TMGMT_DATA_ITEM_STATE_TRANSLATED) {
+          $form['review'][$key][$form_key]['actions'][$gengo_job_id . '_revision_form'] = array(
+            '#type' => 'submit',
+            '#value' => '✍',
+            '#name' => $gengo_job_id . '_revision_form',
+            '#attributes' => array('title' => t('Request new revision'), 'class' => array( $gengo_job_id . '-gengo-id', 'request-revision-button', 'gengo-button')),
+            '#submit' => array('tmgmt_mygengo_gengo_action_form_submit'),
+            '#gengo_action' => 'revision',
+            '#gengo_job_id' => $gengo_job_id,
+            '#ajax' => array(
+              'callback' => 'tmgmt_mygengo_review_form_input_pane_ajax',
+              'wrapper' => $gengo_job_id . '-input-wrapper',
+            ),
+          );
+        }
+
+        $form['review'][$key]['#weight'] = $i++;
+
+        $form['review'][$gengo_job_id . '_gengo'] = array(
+          '#prefix' => '<div class="gengo-pane" id="' . $gengo_job_id . '-gengo-pane">',
+          '#suffix' => '</div>',
+          '#weight' => $i++,
         );
-      }
 
-      if ($data_item['#status'] == TMGMT_DATA_ITEM_STATE_TRANSLATED) {
-        $form['review'][$key][$form_key]['actions'][$gengo_job_id . '_revision_form'] = array(
-          '#type' => 'submit',
-          '#value' => '✍',
-          '#name' => $gengo_job_id . '_revision_form',
-          '#attributes' => array('title' => t('Request new revision'), 'class' => array( $gengo_job_id . '-gengo-id', 'request-revision-button', 'gengo-button')),
-          '#submit' => array('tmgmt_mygengo_gengo_action_form_submit'),
-          '#gengo_action' => 'revision',
-          '#gengo_job_id' => $gengo_job_id,
-          '#ajax' => array(
-            'callback' => 'tmgmt_mygengo_review_form_input_pane_ajax',
-            'wrapper' => $gengo_job_id . '-input-wrapper',
-          ),
+        // Input pane.
+        $form['review'][$gengo_job_id . '_gengo']['input_wrapper'] = array(
+          '#prefix' => '<div class="input-wrapper" id="' . $gengo_job_id . '-input-wrapper">',
+          '#suffix' => '</div>',
         );
-      }
 
-      $form['review'][$key]['#weight'] = $i++;
+        if (!empty($form_state['active_gengo_job_id']) && $form_state['active_gengo_job_id'] == $gengo_job_id) {
+          $form['review'][$gengo_job_id . '_gengo']['input_wrapper'] += $this->getCommentForm($gengo_job_id, $form_state['gengo_action'], $remotes[$form_key]);
+        }
+        // Input pane end.
 
-      $form['review'][$gengo_job_id . '_gengo'] = array(
-        '#prefix' => '<div class="gengo-pane" id="' . $gengo_job_id . '-gengo-pane">',
-        '#suffix' => '</div>',
-        '#weight' => $i++,
-      );
-
-      // Input pane.
-      $form['review'][$gengo_job_id . '_gengo']['input_wrapper'] = array(
-        '#prefix' => '<div class="input-wrapper" id="' . $gengo_job_id . '-input-wrapper">',
-        '#suffix' => '</div>',
-      );
-
-      if (!empty($form_state['active_gengo_job_id']) && $form_state['active_gengo_job_id'] == $gengo_job_id) {
-        $form['review'][$gengo_job_id . '_gengo']['input_wrapper'] += $this->getCommentForm($gengo_job_id, $form_state['gengo_action'], $mapping_data[$form_key]);
-      }
-      // Input pane end.
-
-      // Comments pane.
-      $form['review'][$gengo_job_id . '_gengo']['comments_wrapper'] = array(
-        '#prefix' => '<div class="comments-wrapper" id="' . $gengo_job_id . '-comments-wrapper">',
-        '#suffix' => '</div>',
-      );
-
-      $thread = $this->fetchComments($job->getTranslator(), $gengo_job_id, !empty($form_state['submitted_gengo_action']));
-
-      $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['comments'] = array(
-        '#type' => 'markup',
-        '#markup' => theme('tmgmt_mygengo_comments_thread', array('thread' => $thread, 'gengo_job_id' => $gengo_job_id)),
-        '#tree' => FALSE,
-      );
-
-      if (!empty($form_state['submitted_gengo_action'])) {
-        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_comment_gengo_id'] = array(
-          '#type' => 'hidden',
-          '#value' => $gengo_job_id,
+        // Comments pane.
+        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper'] = array(
+          '#prefix' => '<div class="comments-wrapper" id="' . $gengo_job_id . '-comments-wrapper">',
+          '#suffix' => '</div>',
         );
-        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_gengo_action'] = array(
-          '#type' => 'hidden',
-          '#value' => $form_state['submitted_gengo_action'],
+
+        $thread = $this->fetchComments($job->getTranslator(), $gengo_job_id, !empty($form_state['submitted_gengo_action']));
+
+        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['comments'] = array(
+          '#type' => 'markup',
+          '#markup' => theme('tmgmt_mygengo_comments_thread', array('thread' => $thread, 'gengo_job_id' => $gengo_job_id)),
+          '#tree' => FALSE,
         );
-        $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['ajaxid'] = array(
-          '#type' => 'hidden',
-          // We strip the --n increment as we are targeting element which is not
-          // ajax reloaded, therefore its id attribute will not change.
-          '#value' => substr($form['review'][$key][$form_key]['#ajaxid'], 0, strpos($form['review'][$key][$form_key]['#ajaxid'], '--')),
-        );
+
+        if (!empty($form_state['submitted_gengo_action'])) {
+          $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_comment_gengo_id'] = array(
+            '#type' => 'hidden',
+            '#value' => $gengo_job_id,
+          );
+          $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_gengo_action'] = array(
+            '#type' => 'hidden',
+            '#value' => $form_state['submitted_gengo_action'],
+          );
+          $form['review'][$gengo_job_id . '_gengo']['comments_wrapper']['ajaxid'] = array(
+            '#type' => 'hidden',
+            // We strip the --n increment as we are targeting element which is not
+            // ajax reloaded, therefore its id attribute will not change.
+            '#value' => substr($form['review'][$key][$form_key]['#ajaxid'], 0, strpos($form['review'][$key][$form_key]['#ajaxid'], '--')),
+          );
+        }
+        // Comments pane end.
       }
-      // Comments pane end.
     }
 
     return $form;
@@ -144,13 +142,13 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
    *   Gengo job id.
    * @param $action
    *   Action requested by user (comment, revision)
-   * @param object $mapping
+   * @param object $remote
    *   Data item mapping object.
    *
    * @return array
    *   Built form array.
    */
-  protected function getCommentForm($gengo_job_id, $action, $mapping) {
+  protected function getCommentForm($gengo_job_id, $action, $remote) {
 
     $submit_base = array(
       '#type' => 'submit',
@@ -168,9 +166,9 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
         '#title' => t('Revision comment'),
         '#description' => t('Provide instructions for the translator.'),
       );
-      $form[$gengo_job_id . '_key_array'] = array(
+      $form[$gengo_job_id . '_data_item_key'] = array(
         '#type' => 'value',
-        '#value' => $mapping->key_array,
+        '#value' => $remote->data_item_key,
       );
 
       $form[$gengo_job_id . '_submit_revision'] = $submit_base + array(

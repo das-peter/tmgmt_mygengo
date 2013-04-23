@@ -20,6 +20,12 @@ function tmgmt_mygengo_test_menu() {
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
+  $items['tmgmt_mygengo_mock/v2/translate/order/%'] = array(
+    'page callback' => 'tmgmt_mygengo_test_service_order_get',
+    'page arguments' => array(4),
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE,
+  );
   $items['tmgmt_mygengo_mock/v2/translate/job/%/comment'] = array(
     'page callback' => 'tmgmt_mygengo_test_service_comment_create',
     'page arguments' => array(4),
@@ -97,6 +103,35 @@ function tmgmt_mygengo_test_service_jobs_get() {
   drupal_json_output(array(
     'opstat' => 'ok',
     'response' => variable_get('tmgmt_mygengo_test_last_gengo_response'),
+  ));
+}
+
+/**
+ * Mock service to return information about an order.
+ */
+function tmgmt_mygengo_test_service_order_get($order_id) {
+  debug($order_id);
+  $orders = variable_get('tmgmt_mygengo_test_orders', array());
+  debug($orders[$order_id]);
+  if (isset($orders[$order_id])) {
+    $order = (object) array(
+      'order_id' => $order_id,
+      'jobs_available' => array(),
+      'jobs_queued' => 0,
+      'total_jobs' => count($orders[$order_id]),
+    );
+    foreach ($orders[$order_id] as $job) {
+      $order->jobs_available[] = $job->job_id;
+    }
+    drupal_json_output(array(
+      'opstat' => 'ok',
+      'response' => array('order' => $order),
+    ));
+    return;
+  }
+  drupal_json_output(array(
+    'opstat' => 'error',
+    'err' => array('code' => 123, 'msg' => 'Order id ' . $order_id . ' does not exist'),
   ));
 }
 
@@ -284,6 +319,22 @@ function tmgmt_mygengo_test_service_translate() {
       else {
         $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, NULL, 'pending', $job->tier, $job->custom_data, $job->slug, $job->position);
       }
+    }
+
+    // If order mode is enabled, return an order_id instead of the jobs.
+    if (variable_get('tmgmt_mygengo_test_order_mode')) {
+      $orders = variable_get('tmgmt_mygengo_test_orders', array());
+      if (empty($orders)) {
+        $order_id = 1;
+      }
+      else {
+        $order_id = count($orders) + 1;
+      }
+      $orders[$order_id] = $response->jobs;
+      debug($orders);
+      variable_set('tmgmt_mygengo_test_orders', $orders);
+      unset($response->jobs);
+      $response->order_id = $order_id;
     }
 
     // Save the response so that it can be further examined.

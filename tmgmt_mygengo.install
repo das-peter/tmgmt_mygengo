@@ -6,61 +6,46 @@
  */
 
 /**
- * Implements hook_schema().
- */
-function tmgmt_mygengo_schema() {
-  $schema['tmgmt_mygengo_mappings'] = array(
-    'description' => 'Mapping table for remote gengo jobs to tmgmt jobs.',
-    'fields' => array(
-      'tjid' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'description' => '{tmgmt_job}.tjid foreign key',
-      ),
-      'gjid' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'description' => 'Gengo job id',
-      ),
-      'gorder_id' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'description' => 'Gengo order id',
-      ),
-      'data_item_key' => array(
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-        'description' => 'Translation job data item key.',
-      ),
-    ),
-    'indexes' => array(
-      'tjid' => array('tjid'),
-      'data_item_key' => array('data_item_key'),
-    ),
-  );
-
-  return $schema;
-}
-
-/**
  * Creates tmgmt_mygengo_mapping table.
  */
 function tmgmt_mygengo_update_7001() {
-  drupal_install_schema('tmgmt_mygengo');
+  // Removed as it relied on the schema.
 }
 
 /**
  * Adds Gengo order id field into mapping table.
  */
 function tmgmt_mygengo_update_7002() {
-  $schema = tmgmt_mygengo_schema();
+  // Removed as it relied on the schema.
+}
 
-  if (!db_field_exists('tmgmt_mygengo_mappings', 'gorder_id')) {
-    db_add_field('tmgmt_mygengo_mappings', 'gorder_id', $schema['tmgmt_mygengo_mappings']['fields']['gorder_id']);
+/**
+ * Migrates gengo mapping data to the core tmgmt mapping.
+ */
+function tmgmt_mygengo_update_7003() {
+  if (!db_table_exists('tmgmt_mygengo_mappings')) {
+    return;
   }
+  $result = db_query('SELECT * FROM {tmgmt_mygengo_mappings}');
+
+  $insert = db_insert('tmgmt_remote')->fields(array('tjid', 'tjiid', 'data_item_key', 'remote_identifier_1', 'remote_identifier_2'));
+  foreach ($result as $mapping) {
+    // Ignore placeholder mappings.
+    if (empty($mapping->data_item_key)) {
+      continue;
+    }
+
+    // Extract job item id and data item key.
+    list(, $tjiid, $data_item_key) = explode('][', $mapping->data_item_key, 3);
+    $insert->values(array(
+      'tjid' => $mapping->tjid,
+      'tjiid' => $tjiid,
+      'data_item_key' => $data_item_key,
+      'remote_identifier_1' => $mapping->gorder_id,
+      'remote_identifier_2' => $mapping->gjid,
+    ));
+  }
+  $insert->execute();
+
+  db_drop_table('tmgmt_mygengo_mappings');
 }
