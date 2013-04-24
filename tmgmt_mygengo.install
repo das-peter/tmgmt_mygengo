@@ -36,7 +36,16 @@ function tmgmt_mygengo_update_7003() {
     }
 
     // Extract job item id and data item key.
-    list(, $tjiid, $data_item_key) = explode('][', $mapping->data_item_key, 3);
+    list($tjid, $tjiid, $data_item_key) = explode('][', $mapping->data_item_key, 3);
+    // If tjiid isn't an integer, this seems to be a broken mapping that does
+    // not contain the job id.
+    if ((int)$tjiid == 0) {
+      if (!empty($data_item_key)) {
+        $tjiid .= '][' . $data_item_key;
+      }
+      $data_item_key = $tjiid;
+      $tjiid = $tjid;
+    }
     $insert->values(array(
       'tjid' => $mapping->tjid,
       'tjiid' => $tjiid,
