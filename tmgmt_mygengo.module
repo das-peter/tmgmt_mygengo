@@ -246,6 +246,11 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
   // Fetch everything for this job, this updates the mapping and saves
   // translations if there are any.
   $controller->fetchGengoJobs($job);
+
+  // Clear comments cache.
+  // @todo: Improve cache id to clear cache for this job item only?
+  cache_clear_all('tmgmt_mygengo_comments_', 'cache_tmgmt', TRUE);
+
   drupal_set_message(t('All available translations from Gengo have been polled.'));
 }
 
@@ -253,6 +258,18 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
  * Process response from mygengo.
  */
 function tmgmt_mygengo_callback() {
+  // First, check if this is a comment notification.
+  if (isset($_POST['comment'])) {
+    $comment = json_decode($_POST['comment']);
+    cache_clear_all('tmgmt_mygengo_comments_' . $comment->job_id, 'cache_tmgmt');
+    return '';
+  }
+
+  // Check if we have a job.
+  if (!isset($_POST['job'])) {
+    return MENU_NOT_FOUND;
+  }
+
   $data = json_decode($_POST['job']);
   list($tjid, $tjiid, $data_item_key) = explode('][', $data->custom_data, 3);
   $job = tmgmt_job_load($tjid);
@@ -299,16 +316,8 @@ function tmgmt_mygengo_callback() {
  * tmgmt_mygengo_callback access check.
  */
 function tmgmt_mygengo_access_check() {
-  try {
-    $job = json_decode($_POST['job']);
-    // @todo Validate signature/key.
-    return TRUE;
-  } catch (Exception $e) {
-
-    // Debug it for now, why not...
-    watchdog('mygengo', print_r($_REQUEST, TRUE));
-    return FALSE;
-  }
+  // @todo Add validation.
+  return TRUE;
 }
 
 /**
