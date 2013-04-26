@@ -2,7 +2,7 @@ name = Gengo Translator
 description = Crowd-sourced translation service, former myGengo. Sign up at http://gengo.com/!
 package = Translation Management
 core = 7.x
-dependencies[] = tmgmt
+dependencies[] = tmgmt (>=7.x-1.0-alpha3)
 test_dependencies[] = rules
 test_dependencies[] = tmgmt_ui
 test_dependencies[] = views_bulk_operations
