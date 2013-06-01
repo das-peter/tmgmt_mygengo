@@ -91,16 +91,16 @@ class TMGMTGengoConnector {
   /**
    * Gets available languages.
    *
-   * @param string $mapped_source_language
+   * @param string $remote_source_language
    *   Mapped source lang code.
    *
    * @return object
    *   Gengo response data.
    */
-  function getLanguages($mapped_source_language = NULL) {
+  function getLanguages($remote_source_language = NULL) {
     $data = array();
-    if (!empty($mapped_source_language)) {
-      $data = array('lc_src' => $mapped_source_language);
+    if (!empty($remote_source_language)) {
+      $data = array('lc_src' => $remote_source_language);
     }
     return $this->get('translate/service/languages', $data);
   }

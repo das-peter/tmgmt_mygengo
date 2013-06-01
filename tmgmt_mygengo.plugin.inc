@@ -125,20 +125,6 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Implements TMGMTDefaultTranslatorPluginController::canTranslate().
-   */
-  public function canTranslate(TMGMTTranslator $translator, TMGMTJob $job) {
-
-    $target_lang = $this->mapToRemoteLanguage($translator, $job->target_language);
-    $source_lang = $this->mapToRemoteLanguage($translator, $job->source_language);
-
-    if ($this->isAvailable($translator) && array_key_exists($target_lang, $translator->getSupportedTargetLanguages($source_lang))) {
-      return TRUE;
-    }
-    return FALSE;
-  }
-
-  /**
    * Will build and send a job to gengo service.
    *
    * @param TMGMTJob $job

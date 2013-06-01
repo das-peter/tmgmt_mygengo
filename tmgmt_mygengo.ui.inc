@@ -468,7 +468,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
 
     foreach ($gengo_language_pairs as $tier) {
       // Skip if for other language pairs.
-      if ($tier->lc_src != $translator->mapToRemoteLanguage($job->source_language) || $tier->lc_tgt != $translator->mapToLocalLanguage($job->target_language)) {
+      if ($tier->lc_src != $translator->mapToRemoteLanguage($job->source_language) || $tier->lc_tgt != $translator->mapToRemoteLanguage($job->target_language)) {
         continue;
       }
 
