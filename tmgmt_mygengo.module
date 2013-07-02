@@ -34,7 +34,11 @@ define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
  * @see TMGMTMyGengoTranslatorUIController::reviewForm()
  */
 function tmgmt_mygengo_review_comments_pane_form_ajax($form, &$form_state) {
-  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_gengo']['comments_wrapper'];
+  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
+  $target_key = $form_state['triggering_element']['#target_key'];
+  $parts = explode('|', $target_key);
+  $top_key = $parts[0];
+  return $form['review'][$top_key][$target_key]['below'][$gengo_job_id . '_gengo']['comments_wrapper'];
 }
 /**
  * Ajax callback for input pane form part in the review tool.
@@ -42,15 +46,11 @@ function tmgmt_mygengo_review_comments_pane_form_ajax($form, &$form_state) {
  * @see TMGMTMyGengoTranslatorUIController::reviewForm()
  */
 function tmgmt_mygengo_review_form_input_pane_ajax($form, &$form_state) {
-  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_gengo']['input_wrapper'];
-}
-/**
- * Ajax callback for whole gengo pane form part in the review tool.
- *
- * @see TMGMTMyGengoTranslatorUIController::reviewForm()
- */
-function tmgmt_mygengo_review_form_gengo_pane_ajax($form, &$form_state) {
-  return $form['review'][$form_state['triggering_element']['#gengo_job_id'] . '_gengo'];
+  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
+  $target_key = $form_state['triggering_element']['#target_key'];
+  $parts = explode('|', $target_key);
+  $top_key = $parts[0];
+  return $form['review'][$top_key][$target_key]['below'][$gengo_job_id . '_gengo']['input_wrapper'];
 }
 
 /**

@@ -264,6 +264,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         $response_job = reset($response_job);
       }
 
+      // Not sure what this status means - I was unable to find its purpose in
+      // the gengo documentation. But if we have this status we will receive
+      // no data at all and therefore we will not be able to create mapping.
+      // @todo - this is just a quick fix so that we can finish job submission
+      // in such case. But not a solution as we end up with not mapped jobs
+      // at gengo. This should be fixed in #2022147.
+      if ($response_job->status == 'held') {
+        continue;
+      }
+
       // In case we receive an existing translation the array offset IS also
       // the data kay, and we ought to use it as the object custom data is not
       // updated. However this is not always the case and in some case we
