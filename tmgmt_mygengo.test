@@ -307,7 +307,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     variable_set('tmgmt_mygengo_test_last_gengo_response', (object) array('jobs' => $orders[$order_id]));
 
     // Poll jobs from gengo.
-    $this->drupalPost('admin/config/regional/tmgmt/jobs/' . $job->tjid, array(), t('Poll translations'));
+    $this->drupalPost('admin/tmgmt/jobs/' . $job->tjid, array(), t('Poll translations'));
     $this->assertText(t('All available translations from Gengo have been polled.'));
 
     // Check the updated mappings of item 1.
@@ -514,13 +514,13 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'title');
     $remote = reset($remotes);
 
-    $this->drupalPostAJAX('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), array($remote->remote_identifier_2 . '_comment_form' => '✉'));
+    $this->drupalPostAJAX('admin/tmgmt/items/' . $item->tjiid, array(), array($remote->remote_identifier_2 . '_comment_form' => '✉'));
     $this->assertText(t('New comment'));
     $comment = $this->randomName();
     $this->drupalPostAJAX(NULL, array($remote->remote_identifier_2 . '_comment' => $comment), array($remote->remote_identifier_2 . '_submit' => t('Submit comment')));
 
     // Reload the review form again and check if comment text is present.
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
+    $this->drupalGet('admin/tmgmt/items/' . $item->tjiid);
     $this->assertText($comment);
 
     // Put first data item (Title "Nice day") into translated status so we can
@@ -535,7 +535,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     // Request a review.
     $comment = $this->randomName();
-    $this->drupalPostAJAX('admin/config/regional/tmgmt/items/' . $item->tjiid, array(), array($remote->remote_identifier_2 . '_revision_form' => '✍'));
+    $this->drupalPostAJAX('admin/tmgmt/items/' . $item->tjiid, array(), array($remote->remote_identifier_2 . '_revision_form' => '✍'));
     $this->drupalPostAJAX(NULL, array($remote->remote_identifier_2 . '_comment' => $comment), array($remote->remote_identifier_2 . '_submit' => t('Request revision')));
 
     $job = tmgmt_job_load($job->tjid);
@@ -543,7 +543,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // Test the data item status - should be back to pending.
     $this->assertEqual($data[$item->tjiid]['#status'], TMGMT_DATA_ITEM_STATE_PENDING);
     // Reload the review form again and check if comment text is present.
-    $this->drupalGet('admin/config/regional/tmgmt/items/' . $item->tjiid);
+    $this->drupalGet('admin/tmgmt/items/' . $item->tjiid);
     $this->assertText($comment);
   }
 
@@ -581,7 +581,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     variable_set('tmgmt_mygengo_test_last_gengo_response', $data);
 
     // Poll jobs from gengo.
-    $this->drupalPost('admin/config/regional/tmgmt/jobs/' . $job->tjid, array(), t('Poll translations'));
+    $this->drupalPost('admin/tmgmt/jobs/' . $job->tjid, array(), t('Poll translations'));
     $this->assertText(t('All available translations from Gengo have been polled.'));
 
     // Reload item data.
@@ -620,7 +620,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     );
     $item->save();
 
-    $this->drupalGet('admin/config/regional/tmgmt/jobs/' . $job->tjid);
+    $this->drupalGet('admin/tmgmt/jobs/' . $job->tjid);
     $needed_credits = $this->xpath('//div[@id=:id]', array(':id' => 'edit-settings-quote-needed-credits'));
     // The quote service returns two jobs each worth 2.
     $this->assertTrue(strpos($needed_credits[0]->asXML(), '4') !== FALSE);
