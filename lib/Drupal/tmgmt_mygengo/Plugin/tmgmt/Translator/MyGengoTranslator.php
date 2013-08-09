@@ -5,10 +5,33 @@
  * Provides Gengo translation plugin controller.
  */
 
+namespace Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator;
+
+use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\tmgmt\Plugin\Core\Entity\Job;
+use Drupal\tmgmt\Plugin\Core\Entity\Translator;
+use Drupal\tmgmt\TMGMTException;
+use Drupal\tmgmt\TranslatorPluginBase;
+use Drupal\tmgmt\Annotation\TranslatorPlugin;
+use Drupal\Core\Annotation\Translation;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\tmgmt_mygengo\GengoConnector;
+use Guzzle\Http\ClientInterface;
+
 /**
  * Gengo translation plugin controller.
+ *
+ * @TranslatorPlugin(
+ *   id = "mygengo",
+ *   label = @Translation("Gengo translator"),
+ *   description = @Translation("A Gengo translator service."),
+ *   ui = "Drupal\tmgmt_mygengo\MyGengoTranslatorUi",
+ *   default_settings = {
+ *     "show_remaining_credits_info" = 1
+ *   }
+ * )
  */
-class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController {
+class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactoryPluginInterface {
 
   /**
    * If set it will be sent by job post action as a comment.
@@ -18,7 +41,43 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   protected $serviceComment;
 
   /**
-   * Implements TMGMTDefaultTranslatorPluginController::getDefaultRemoteLanguagesMappings().
+   * Guzzle HTTP client.
+   *
+   * @var \Guzzle\Http\ClientInterface
+   */
+  protected $client;
+
+  /**
+   * Constructs a MyGengoTranslator object.
+   *
+   * @param \Guzzle\Http\ClientInterface $client
+   *   The Guzzle HTTP client.
+   * @param array $configuration
+   *   A configuration array containing information about the plugin instance.
+   * @param string $plugin_id
+   *   The plugin_id for the plugin instance.
+   * @param array $plugin_definition
+   *   The plugin implementation definition.
+   */
+  public function __construct(ClientInterface $client, array $configuration, $plugin_id, array $plugin_definition) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+    $this->client = $client;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, array $plugin_definition) {
+    return new static(
+      $container->get('http_default_client'),
+      $configuration,
+      $plugin_id,
+      $plugin_definition
+    );
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public function getDefaultRemoteLanguagesMappings() {
     return array(
@@ -31,18 +90,19 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * Sets comment to be sent to gengo service with job post request.
    *
    * @param string $comment
+   *   The comment to be sent.
    */
   public function setServiceComment($comment) {
     $this->serviceComment = check_plain(trim($comment));
   }
 
   /**
-   * Implements TMGMTTranslatorRejectDataItem::rejectForm()
+   * {@inheritdoc}
    */
   public function rejectForm($form, &$form_state) {
     $form['message'] = array(
       '#markup' => '<div class="messages warning">' .
-          t('By rejecting this item you will submit a new translate job to the Gengo translate service which will result in additional costs.') . '</div>',
+        t('By rejecting this item you will submit a new translate job to the Gengo translate service which will result in additional costs.') . '</div>',
     );
     $form['comment'] = array(
       '#type' => 'textarea',
@@ -53,9 +113,9 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Implements TMGMTTranslatorPluginControllerInterface::isAvailable().
+   * {@inheritdoc}
    */
-  public function isAvailable(TMGMTTranslator $translator) {
+  public function isAvailable(Translator $translator) {
     if ($translator->getSetting('api_public_key') && $translator->getSetting('api_private_key')) {
       return TRUE;
     }
@@ -63,11 +123,11 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Implements TMGMTTranslatorPluginControllerInterface::requestTranslation().
+   * {@inheritdoc}
    *
    * Here we will actually query source and get translations.
    */
-  public function requestTranslation(TMGMTJob $job) {
+  public function requestTranslation(Job $job) {
 
     try {
 
@@ -88,16 +148,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Implements TMGMTDefaultTranslatorPluginController::getSupportedRemoteLanguages().
+   * {@inheritdoc}
    */
-  function getSupportedRemoteLanguages(TMGMTTranslator $translator) {
+  public function getSupportedRemoteLanguages(Translator $translator) {
     if (!empty($this->supportedRemoteLanguages)) {
       return $this->supportedRemoteLanguages;
     }
 
     try {
-      $connector = new TMGMTGengoConnector($translator);
-      foreach($connector->getLanguages() as $gengo_language) {
+      $connector = new GengoConnector($translator, $this->client);
+      foreach ($connector->getLanguages() as $gengo_language) {
         $this->supportedRemoteLanguages[$gengo_language->lc] = $gengo_language->lc;
       }
     }
@@ -110,12 +170,12 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   }
 
   /**
-   * Implements TMGMTTranslatorPluginControllerInterface::getSupportedTargetLanguages().
+   * {@inheritdoc}
    */
-  public function getSupportedTargetLanguages(TMGMTTranslator $translator, $source_language) {
+  public function getSupportedTargetLanguages(Translator $translator, $source_language) {
     $results = array();
 
-    $connector = new TMGMTGengoConnector($translator);
+    $connector = new GengoConnector($translator, $this->client);
     $response = $connector->getLanguages($translator->mapToRemoteLanguage($source_language));
     foreach ($response as $target) {
       $results[$translator->mapToLocalLanguage($target->lc)] = $translator->mapToLocalLanguage($target->lc);
@@ -127,16 +187,16 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   /**
    * Will build and send a job to gengo service.
    *
-   * @param TMGMTJob $job
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
    *   Job to be submitted for translation.
-   * @param boolean $quote_only
+   * @param bool $quote_only
    *   (Optional) Set to TRUE to only get a quote for the given job.
    *
    * @return mixed
    *   - Array of job objects returned from gengo.
    *   - Status object with order info.
    */
-  public function sendJob(TMGMTJob $job, $quote_only = FALSE) {
+  public function sendJob(Job $job, $quote_only = FALSE) {
     $data = tmgmt_flatten_data($job->getData());
 
     $translator = $job->getTranslator();
@@ -180,7 +240,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       }
     }
 
-    $connector = new TMGMTGengoConnector($job->getTranslator());
+    $connector = new GengoConnector($job->getTranslator(), $this->client);
     if ($quote_only) {
       return $connector->getQuote($translations);
     }
@@ -200,16 +260,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   /**
    * Receives and stores a translation returned by Gengo.
    *
-   * @param TMGMTJob $job
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
    *   Job for which to receive translations.
    * @param string $key
    *   Data keys for data item which will be updated with translation.
    * @param array $data
    *   Translated data received from gengo.
-   * @param TMGMTRemote $remote
-   *   (optional) A remote mapping that should be considered for duplicates.
    */
-  public function saveTranslation(TMGMTJob $job, $key, $data) {
+  public function saveTranslation(Job $job, $key, $data) {
     if ($data->status == 'approved' || $data->status == 'reviewable') {
       // If the status is approved or reviewable, we expect a body_tgt property,
       // abort and log if it doesn't exist.
@@ -222,7 +280,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       // Look for duplicated strings that were saved with a mapping to this key.
       // @todo: Refactor this method to accept the remote instead of $key?
       list($tjiid, $data_item_key) = explode('][', $key, 2);
-      $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $tjiid, $data_item_key);
+      $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $tjiid, $data_item_key);
       $remote = reset($remotes);
       if ($remote && !empty($remote->remote_data['duplicates'])) {
         // If we found any mappings, also add the translation for those.
@@ -241,14 +299,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    *   - Saves translation in case it has been already received.
    *   - Deals with duplicate translations.
    *
-   * @param TMGMTJob $job
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
    *   Local job that is going to be processed.
    * @param array $response_jobs
    *   List of gengo jobs received.
    * @param array $duplicates
    *   Array of duplicate mappings.
    */
-  protected function processGengoJobsUponTranslationRequest(TMGMTJob $job, $response_jobs, array $duplicates) {
+  protected function processGengoJobsUponTranslationRequest(Job $job, $response_jobs, array $duplicates) {
     foreach ($response_jobs as $key => $response_job) {
 
       // Duplicate content has been submitted.
@@ -312,7 +370,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * The idea here is not to introduce additional storage to temporarily store
    * gegngo order id before we get gengo job ids.
    *
-   * @param TMGMTJob $job
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
    *   Job for which to initiate mappings with remote jobs.
    * @param int $gorder_id
    *   Gengo job id.
@@ -321,7 +379,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
    * @param array $duplicates
    *   Array of duplicate mappings.
    */
-  protected function initGengoMapping(TMGMTJob $job, $gorder_id, array $translations, array $duplicates) {
+  protected function initGengoMapping(Job $job, $gorder_id, array $translations, array $duplicates) {
     $items = $job->getItems();
     foreach ($translations as $key => $translation) {
       // Extract job item id and data item key.
@@ -338,14 +396,14 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
   /**
    * Maps TMGMT job data items to gengo jobs.
    *
-   * @param TMGMTJob $job
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
    *   Job that will be mapped to remote jobs.
    */
-  public function fetchGengoJobs(TMGMTJob $job) {
+  public function fetchGengoJobs(Job $job) {
     // Search for placeholder item.
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid);
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid);
 
-    $connector = new TMGMTGengoConnector($job->getTranslator());
+    $connector = new GengoConnector($job->getTranslator(), $this->client);
 
     // Collect unique order id's and job ids.
     $order_ids = array();

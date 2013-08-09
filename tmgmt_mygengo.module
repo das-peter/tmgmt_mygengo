@@ -26,12 +26,16 @@
  *   completely or add some meaning full access control.
  */
 
+use Drupal\tmgmt_mygengo\GengoConnector;
+use Drupal\tmgmt\Plugin\Core\Entity\Job;
+use Drupal\tmgmt\Plugin\Core\Entity\JobItem;
+
 define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
 
 /**
  * Ajax callback for comment pane form in the review tool.
  *
- * @see TMGMTMyGengoTranslatorUIController::reviewForm()
+ * @see MyGengoTranslatorUi::reviewForm()
  */
 function tmgmt_mygengo_review_comments_pane_form_ajax($form, &$form_state) {
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
@@ -43,7 +47,7 @@ function tmgmt_mygengo_review_comments_pane_form_ajax($form, &$form_state) {
 /**
  * Ajax callback for input pane form part in the review tool.
  *
- * @see TMGMTMyGengoTranslatorUIController::reviewForm()
+ * @see MyGengoTranslatorUi::reviewForm()
  */
 function tmgmt_mygengo_review_form_input_pane_ajax($form, &$form_state) {
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
@@ -59,7 +63,7 @@ function tmgmt_mygengo_review_form_input_pane_ajax($form, &$form_state) {
  * Unsets workflow specific data from $form_state to have the form build in the
  * initial state.
  *
- * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
+ * @see MyGengoTranslatorUi::getCommentForm()
  */
 function tmgmt_mygengo_gengo_cancel_form_submit($form, &$form_state) {
   $form_state['rebuild'] = TRUE;
@@ -72,7 +76,7 @@ function tmgmt_mygengo_gengo_cancel_form_submit($form, &$form_state) {
  *
  * Based on clicked button will set workflow data into $form_state.
  *
- * @see TMGMTMyGengoTranslatorUIController::reviewForm()
+ * @see MyGengoTranslatorUi::reviewForm()
  */
 function tmgmt_mygengo_gengo_action_form_submit($form, &$form_state) {
   $form_state['rebuild'] = TRUE;
@@ -83,7 +87,7 @@ function tmgmt_mygengo_gengo_action_form_submit($form, &$form_state) {
 /**
  * Validates comment to be sent to gengo service.
  *
- * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
+ * @see MyGengoTranslatorUi::getCommentForm()
  */
 function tmgmt_mygengo_add_comment_form_validate($form, &$form_state) {
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
@@ -96,19 +100,19 @@ function tmgmt_mygengo_add_comment_form_validate($form, &$form_state) {
 /**
  * Submits comment to gengo service.
  *
- * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
+ * @see MyGengoTranslatorUi::getCommentForm()
  */
 function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
   $form_state['rebuild'] = TRUE;
   $form_state['gengo_action'] = NULL;
   $form_state['active_gengo_job_id'] = NULL;
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
-  /* @var TMGMTJobItem $item */
+  /* @var JobItem $item */
   $item = $form_state['item'];
   $job = $item->getJob();
 
   try {
-    $connector = new TMGMTGengoConnector($job->getTranslator());
+    $connector = new GengoConnector($job->getTranslator(), Drupal::httpClient());
     $connector->postComment($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
     $form_state['submitted_gengo_action'] = 'comment';
   }
@@ -124,19 +128,19 @@ function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
  * Upon successful revision submission to gengo it will put the data item into
  * pending state.
  *
- * @see TMGMTMyGengoTranslatorUIController::getCommentForm()
+ * @see MyGengoTranslatorUi::getCommentForm()
  */
 function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
   $form_state['rebuild'] = TRUE;
   $form_state['gengo_action'] = NULL;
   $form_state['active_gengo_job_id'] = NULL;
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
-  /* @var TMGMTJobItem $item */
+  /* @var JobItem $item */
   $item = $form_state['item'];
   $job = $item->getJob();
 
   try {
-    $connector = new TMGMTGengoConnector($job->getTranslator());
+    $connector = new GengoConnector($job->getTranslator(), Drupal::httpClient());
     $connector->reviseJob($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
 
     $data_item_key = $form_state['values'][$gengo_job_id . '_data_item_key'];
@@ -235,11 +239,11 @@ function tmgmt_mygengo_menu() {
  */
 function _tmgmt_mygengo_poll_submit($form, &$form_state) {
   /**
-   * @var TMGMTJob $job
+   * @var Job $job
    */
   $job = $form_state['tmgmt_job'];
   /**
-   * @var TMGMTMyGengoTranslatorPluginController $controller
+   * @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $controller
    */
   $controller = $job->getTranslator()->getController();
 
@@ -303,7 +307,7 @@ function tmgmt_mygengo_callback() {
   }
 
   /**
-   * @var TMGMTMyGengoTranslatorPluginController $mygengo
+   * @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $mygengo
    */
   $mygengo = $job->getTranslator()->getController();
   // Prepend the job item id.
@@ -318,21 +322,4 @@ function tmgmt_mygengo_callback() {
 function tmgmt_mygengo_access_check() {
   // @todo Add validation.
   return TRUE;
-}
-
-/**
- * Implements hook_tmgmt_translator_plugin_info().
- */
-function tmgmt_mygengo_tmgmt_translator_plugin_info() {
-  return array(
-    'mygengo' => array(
-      'label' => t('Gengo translator'),
-      'description' => t('A Gengo translator service.'),
-      'plugin controller class' => 'TMGMTMyGengoTranslatorPluginController',
-      'ui controller class' => 'TMGMTMyGengoTranslatorUIController',
-      'default settings' => array(
-        'show_remaining_credits_info' => 1,
-      ),
-    ),
-  );
 }

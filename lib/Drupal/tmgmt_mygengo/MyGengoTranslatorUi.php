@@ -5,16 +5,24 @@
  * Please supply a file description.
  */
 
+namespace Drupal\tmgmt_mygengo;
+
+use Drupal\tmgmt\TranslatorPluginUiBase;
+use Drupal\tmgmt\Plugin\Core\Entity\Job;
+use Drupal\tmgmt\Plugin\Core\Entity\JobItem;
+use Drupal\tmgmt\Plugin\Core\Entity\Translator;
+use Drupal\tmgmt\TMGMTException;
+
 /**
  * @file
  * Provides Gengo translation plugin controller.
  */
-class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIController {
+class MyGengoTranslatorUi extends TranslatorPluginUiBase {
 
   /**
-   * Implements TMGMTTranslatorUIControllerInterface::reviewDataItemElement().
+   * {@inheritdoc}
    */
-  public function reviewDataItemElement($form, &$form_state, $data_item_key, $parent_key, array $data_item, TMGMTJobItem $item) {
+  public function reviewDataItemElement($form, &$form_state, $data_item_key, $parent_key, array $data_item, JobItem $item) {
 
     /** @var TMGMTRemote $mapping */
     $mapping = NULL;
@@ -119,14 +127,13 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       );
     }
     // Comments pane end.
-
     return $form;
   }
 
   /**
-   * Implements TMGMTTranslatorUIControllerInterface::reviewForm().
+   * {@inheritdoc}
    */
-  public function reviewForm($form, &$form_state, TMGMTJobItem $item) {
+  public function reviewForm($form, &$form_state, JobItem $item) {
 
     $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo_comments.js';
     $form['#attached']['css'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/css/tmgmt_mygengo_comments.css';
@@ -141,7 +148,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
    *   For ajax id.
    * @param int $gengo_job_id
    *   Gengo job id.
-   * @param $action
+   * @param string $action
    *   Action requested by user (comment, revision)
    * @param object $mapping
    *   Data item mapping object.
@@ -214,9 +221,9 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
   }
 
   /**
-   * Overrides TMGMTDefaultTranslatorUIController::pluginSettingsForm().
+   * {@inheritdoc}
    */
-  public function pluginSettingsForm($form, &$form_state, TMGMTTranslator $translator, $busy = FALSE) {
+  public function pluginSettingsForm($form, &$form_state, Translator $translator, $busy = FALSE) {
 
     $form['api_public_key'] = array(
       '#type' => 'textfield',
@@ -263,9 +270,9 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
   }
 
   /**
-   * Overrides TMGMTDefaultTranslatorUIController::checkoutSettingsForm().
+   * {@inheritdoc}
    */
-  public function checkoutSettingsForm($form, &$form_state, TMGMTJob $job) {
+  public function checkoutSettingsForm($form, &$form_state, Job $job) {
     $translator = $job->getTranslator();
 
     // Set the quality setting from submitted vals - we need this for quote as
@@ -337,9 +344,9 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
   }
 
   /**
-   * Implements TMGMTTranslatorUIControllerInterface::checkoutInfo().
+   * {@inheritdoc}
    */
-  public function checkoutInfo(TMGMTJob $job) {
+  public function checkoutInfo(Job $job) {
     $form = array();
 
     if ($job->isActive()) {
@@ -357,18 +364,18 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
   /**
    * Get a quote from Gengo for the given job.
    *
-   * @param TMGMTJob $job
+   * @param Job $job
    *   Job for which to get a quote.
    *
    * @return array
    *   Array with the following keys: currency, estimates, highest_eta,
    *   sum_credits, sum_eta, sum_word_count, and unit_price.
-   * @throws TMGMTException
+   * @throws \Drupal\tmgmt\TMGMTException
    *   In case of error doing request to gengo service.
    */
-  protected function getQuoteInfo(TMGMTJob $job) {
+  protected function getQuoteInfo(Job $job) {
     $response = NULL;
-    /* @var TMGMTMyGengoTranslatorPluginController $plugin */
+    /* @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $plugin */
     $plugin = $job->getTranslatorController();
 
     try {
@@ -379,7 +386,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       drupal_set_message($e->getMessage(), 'error');
     }
 
-    // Setup empty values
+    // Setup empty values.
     $quote = array(
       'currency' => '',
       'estimated' => FALSE,
@@ -410,14 +417,14 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
   /**
    * Gets remaining credit info at gengo account.
    *
-   * @param TMGMTTranslator $translator
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Translator $translator
    *   Translator.
    *
    * @return array
    *   Associative array of currency and credits.
    */
-  protected function getRemainingCreditInfo(TMGMTTranslator $translator) {
-    $connector = new TMGMTGengoConnector($translator);
+  protected function getRemainingCreditInfo(Translator $translator) {
+    $connector = new GengoConnector($translator);
     $credit_info = array(
       'credits' => NULL,
       'currency' => NULL,
@@ -438,13 +445,13 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
   /**
    * Builds quality/tier options for src/tgt language pair of the job.
    *
-   * @param TMGMTJob $job
+   * @param Job $job
    *   Translation job.
    *
    * @return array
    *   Associative array of tiers with info.
    */
-  protected function getAvailableTiersOptions(TMGMTJob $job) {
+  protected function getAvailableTiersOptions(Job $job) {
 
     $translator = $job->getTranslator();
 
@@ -460,7 +467,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
     // Machine translation is always available.
     $available_tiers['machine'] = $tier_names['machine'];
 
-    $connector = new TMGMTGengoConnector($translator);
+    $connector = new GengoConnector($translator);
     $gengo_language_pairs = array();
 
     try {
@@ -497,16 +504,17 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
   /**
    * Fetches comments from gengo service.
    *
-   * @param TMGMTTranslator $translator
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Translator $translator
    *   Translator plugin.
-   * @param $gengo_job_id
+   * @param int $gengo_job_id
    *   Gengo job id for which to fetch comments.
-   * @param boolean $reload
+   * @param bool $reload
    *   Flag to reload cache.
    *
    * @return array
+   *   List if comments or an empty array.
    */
-  function fetchComments(TMGMTTranslator $translator, $gengo_job_id, $reload = FALSE) {
+  public function fetchComments(Translator $translator, $gengo_job_id, $reload = FALSE) {
 
     $cid = 'tmgmt_mygengo_comments_' . $gengo_job_id;
     $cache = cache_get($cid, 'cache_tmgmt');
@@ -515,7 +523,7 @@ class TMGMTMyGengoTranslatorUIController extends TMGMTDefaultTranslatorUIControl
       return $cache->data;
     }
 
-    $connector = new TMGMTGengoConnector($translator);
+    $connector = new GengoConnector($translator);
     $response = NULL;
 
     try {

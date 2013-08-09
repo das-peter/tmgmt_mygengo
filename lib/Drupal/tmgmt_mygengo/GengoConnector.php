@@ -4,7 +4,15 @@
  * Connector class for Gengo service.
  */
 
-class TMGMTGengoConnector {
+namespace Drupal\tmgmt_mygengo;
+
+use Drupal\tmgmt\Plugin\Core\Entity\Translator;
+use Drupal\tmgmt\TMGMTException;
+use Drupal\Component\Utility\Url;
+use Guzzle\Http\ClientInterface;
+use Guzzle\Http\Exception\RequestException;
+
+class GengoConnector {
 
   /**
    * Translation service URL.
@@ -43,18 +51,25 @@ class TMGMTGengoConnector {
    */
   private $debug = FALSE;
 
+  /**
+   * Guzzle HTTP client.
+   *
+   * @var \Guzzle\Http\ClientInterface
+   */
+  protected $client;
 
   /**
    * Construct the connector to gengo service.
    *
-   * @param TMGMTTranslator $translator
+   * @param \Drupal\tmgmt\Plugin\Core\Entity\Translator $translator
    *   Translator which has the connection settings.
    */
-  function __construct(TMGMTTranslator $translator) {
+  public function __construct(Translator $translator, ClientInterface $client) {
     $this->useSandbox = $translator->getSetting('use_sandbox');
     $this->pubKey = $translator->getSetting('api_public_key');
     $this->privateKey = $translator->getSetting('api_private_key');
     $this->debug = variable_get('tmgmt_mygengo_debug', FALSE);
+    $this->client = $client;
   }
 
   /**
@@ -66,7 +81,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function submitJob(array $gengo_jobs) {
+  public function submitJob(array $gengo_jobs) {
     return $this->post('translate/jobs', array(
       'jobs' => $gengo_jobs,
       'as_group' => (int) (count($gengo_jobs) > 1),
@@ -77,11 +92,12 @@ class TMGMTGengoConnector {
    * Gets a quote for provided jobs.
    *
    * @param array $gengo_jobs
+   *   List of gengo jobs.
    *
    * @return object
    *   Gengo response data.
    */
-  function getQuote(array $gengo_jobs) {
+  public function getQuote(array $gengo_jobs) {
     return $this->post('translate/service/quote', array(
       'jobs' => $gengo_jobs,
       'as_group' => (int) (count($gengo_jobs) > 1),
@@ -97,7 +113,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function getLanguages($remote_source_language = NULL) {
+  public function getLanguages($remote_source_language = NULL) {
     $data = array();
     if (!empty($remote_source_language)) {
       $data = array('lc_src' => $remote_source_language);
@@ -111,7 +127,7 @@ class TMGMTGengoConnector {
    * @return object
    *   List of language pairs.
    */
-  function getLanguagePairs() {
+  public function getLanguagePairs() {
     return $this->get('translate/service/language_pairs');
   }
 
@@ -121,7 +137,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function getRemainingCredit() {
+  public function getRemainingCredit() {
     return $this->get('account/balance');
   }
 
@@ -136,7 +152,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function postComment($gengo_job_id, $comment_text) {
+  public function postComment($gengo_job_id, $comment_text) {
     return $this->post('translate/job/' . $gengo_job_id . '/comment', array('body' => $comment_text));
   }
 
@@ -149,7 +165,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function getComments($gengo_job_id) {
+  public function getComments($gengo_job_id) {
     return $this->get('translate/job/' . $gengo_job_id . '/comments');
   }
 
@@ -162,7 +178,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function getOrder($gorder_id) {
+  public function getOrder($gorder_id) {
     return $this->get('translate/order/' . $gorder_id);
   }
 
@@ -175,7 +191,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function getJobs(array $gengo_job_ids) {
+  public function getJobs(array $gengo_job_ids) {
     return $this->get('translate/jobs/' . implode(',', $gengo_job_ids));
   }
 
@@ -188,8 +204,9 @@ class TMGMTGengoConnector {
    *   Additional data to be sent.
    *
    * @return object
+   *   Gengo response data.
    */
-  function approveJob($gengo_job_id, array $data) {
+  public function approveJob($gengo_job_id, array $data) {
     $data += array('action' => 'approve');
     return $this->put('translate/job/' . $gengo_job_id, $data);
   }
@@ -198,11 +215,14 @@ class TMGMTGengoConnector {
    * Submits a job for revision.
    *
    * @param int $gengo_job_id
+   *   Gengo job id.
    * @param string $comment
+   *   Comment to set.
    *
    * @return object
+   *   Gengo response data.
    */
-  function reviseJob($gengo_job_id, $comment) {
+  public function reviseJob($gengo_job_id, $comment) {
     return $this->put('translate/job/' . $gengo_job_id, array(
       'action' => 'revise',
       'comment' => $comment,
@@ -210,7 +230,7 @@ class TMGMTGengoConnector {
   }
 
   /**
-   * Get request to gengo service.
+   * GET request to gengo service.
    *
    * @param string $path
    *   Resource path.
@@ -220,12 +240,14 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function get($path, $data = array()) {
+  public function get($path, $data = array()) {
     return $this->request($path, 'GET', $data);
   }
 
   /**
-   * @param $path
+   * POST request to gengo service.
+   *
+   * @param string $path
    *   Resource path.
    * @param array $data
    *   Post data.
@@ -233,12 +255,14 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function post($path, $data = array()) {
+  public function post($path, $data = array()) {
     return $this->request($path, 'POST', $data);
   }
 
   /**
-   * @param $path
+   * PUT request to gengo service.
+   *
+   * @param string $path
    *   Resource path.
    * @param array $data
    *   PUT data.
@@ -246,7 +270,7 @@ class TMGMTGengoConnector {
    * @return object
    *   Gengo response data.
    */
-  function put($path, $data = array()) {
+  public function put($path, $data = array()) {
     return $this->request($path, 'PUT', $data);
   }
 
@@ -263,15 +287,12 @@ class TMGMTGengoConnector {
    * @return object
    *   Response object from gengo.
    *
-   * @throws TMGMTException
+   * @throws \Drupal\tmgmt\TMGMTException
    */
   protected function request($path, $method, $data = array()) {
-    $options = array(
-      'headers' => array(
-        'User-Agent' => $this->getUserAgent(),
-        'Accept' => 'application/json'
-      ),
-      'method' => $method,
+    $headers = array(
+      'User-Agent' => $this->getUserAgent(),
+      'Accept' => 'application/json',
     );
 
     $timestamp = gmdate('U');
@@ -285,45 +306,52 @@ class TMGMTGengoConnector {
     else {
       $url = self::PRODUCTION_URL . '/' . self::API_VERSION . '/' . $path;
     }
+    try {
+      if ($method == 'GET' || $method == 'DELETE') {
+        $query = array_merge(array(
+          'api_key' => $this->pubKey,
+          'api_sig' => hash_hmac('sha1', $timestamp, $this->privateKey),
+          'ts' => $timestamp,
+        ), $data);
 
-    if ($method == 'GET' || $method == 'DELETE') {
-      $query = array_merge(array(
-        'api_key' => $this->pubKey,
-        'api_sig' => hash_hmac('sha1', $timestamp, $this->privateKey),
-        'ts' => $timestamp
-      ), $data);
+        $url = url($url, array('query' => $query, 'absolute' => TRUE));
+        $response = $this->client->createRequest($method, $url, $headers)->send();
+      }
+      else {
+        $headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        $data = Url::buildQuery(array(
+          'api_key' => $this->pubKey,
+          'api_sig' => hash_hmac('sha1', $timestamp, $this->privateKey),
+          'ts' => $timestamp,
+          'data' => json_encode($data),
+        ));
 
-      $url = url($url, array('query' => $query, 'absolute' => TRUE));
-      $response = drupal_http_request($url, $options);
+        $url = url($url, array('absolute' => TRUE));
+        $response = $this->client->createRequest($method, $url, $headers, $data)->send();
+      }
+
+      if ($this->debug == TRUE) {
+        watchdog('tmgmt_mygengo', "Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
+          '@url' => $url,
+          '@method' => $method,
+          '@data' => var_export($response->getRequest(), TRUE),
+          '@response' => var_export($response, TRUE),
+        ), WATCHDOG_DEBUG);
+      }
     }
-    else {
-      $options['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
-      $options['data'] = drupal_http_build_query(array(
-        'api_key' => $this->pubKey,
-        'api_sig' => hash_hmac('sha1', $timestamp, $this->privateKey),
-        'ts' => $timestamp,
-        'data' => json_encode($data)
-      ));
-
-      $url = url($url, array('absolute' => TRUE));
-      $response = drupal_http_request($url, $options);
-    }
-
-    if ($this->debug == TRUE) {
-      watchdog('tmgmt_mygengo', "Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
-        '@url' => $url,
-        '@method' => $method,
-        '@data' => var_export($options, TRUE),
-        '@response' => var_export($response, TRUE),
-      ), WATCHDOG_DEBUG);
-    }
-
-    if ($response->code != 200 && $response->code != 201) {
+    catch (RequestException $e) {
+      $status_codes = Response::$statusTexts;
       throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
-        array('@error' => $response->error, '@url' => $url));
+        array('@error' => $status_codes[$response->getStatusCode()], '@url' => $url));
     }
 
-    $results = json_decode($response->data);
+    if ($response->getStatusCode() != 200 && $response->getStatusCode() != 201) {
+      $status_codes = Response::$statusTexts;
+      throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
+        array('@error' => $status_codes[$response->getStatusCode()], '@url' => $url));
+    }
+
+    $results = $response->json();
 
     if ($results->opstat == 'ok' && isset($results->response)) {
       return $results->response;
@@ -350,7 +378,7 @@ class TMGMTGengoConnector {
    * @return string
    *   The user agent being.
    */
-  function getUserAgent() {
+  public function getUserAgent() {
     global $base_url;
 
     $info = system_get_info('module', 'tmgmt');

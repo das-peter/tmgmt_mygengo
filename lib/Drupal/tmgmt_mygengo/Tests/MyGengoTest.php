@@ -5,30 +5,37 @@
  * Test cases for the Gengo translator module.
  */
 
+namespace Drupal\tmgmt_mygengo\Tests;
+
+use Drupal\tmgmt\Tests\TMGMTTestBase;
+
 /**
  * Basic tests for the Gengo translator.
  */
-class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
+class MyGengoTest extends TMGMTTestBase {
 
   /**
    * @var TMGMTTranslator $translator
    */
   protected $translator;
 
-  /**
-   * Implements getInfo().
-   */
-  static function getInfo() {
+  public static $modules = array(
+    'tmgmt_ui',
+    'tmgmt_mygengo',
+    'tmgmt_mygengo_test',
+  );
+
+  public static function getInfo() {
     return array(
-      'name' => t('Gengo Translator tests'),
-      'description' => t('Tests the Gengo translator plugin integration.'),
-      'group' => t('Translation Management'),
+      'name' => 'Gengo Translator tests',
+      'description' => 'Tests the Gengo translator plugin integration.',
+      'group' => 'Translation Management',
     );
   }
 
-  function setUp() {
-    parent::setUp(array('tmgmt_ui', 'tmgmt_mygengo', 'tmgmt_mygengo_test'));
-    $this->setEnvironment('de');
+  public function setUp() {
+    parent::setUp();
+    $this->addLanguage('de');
     $this->translator = tmgmt_translator_load('mygengo');
     variable_set('tmgmt_mygengo_use_mock_service', TRUE);
   }
@@ -36,7 +43,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
   /**
    * Tests basic API methods of the plugin.
    */
-  function testAPI() {
+  public function testAPI() {
 
     $job = $this->createJob();
     $job->settings['quality'] = 'standard';
@@ -87,7 +94,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // Note that requesting translation goes with default
     // gengo_auto_approve = 1
     $job->requestTranslation();
-    // And therefore the job should be active
+    // And therefore the job should be active.
     $this->assertTrue($job->isActive());
     foreach ($job->getItems() as $item) {
       $this->assertTrue($item->isActive());
@@ -111,7 +118,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertTrue(empty($out));
 
     // Clear job item caches.
-    entity_get_controller('tmgmt_job_item')->resetCache();
+    Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
 
     // Verify the label/slug.
     $this->refreshVariables();
@@ -185,7 +192,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     }
   }
 
-  function testOrderModeCallback() {
+  public function testOrderModeCallback() {
     variable_set('tmgmt_mygengo_test_order_mode', 1);
 
     $this->translator->settings['api_public_key'] = 'correct key';
@@ -221,17 +228,17 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->refreshVariables();
     $orders = variable_get('tmgmt_mygengo_test_orders', array());
     $order_id = key($orders);
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid);
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid);
     // Remotes should have been created with the order id and without job id.
     $this->assertEqual(count($remotes), 3, '3 remote mappings created.');
 
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'wrapper][subwrapper1');
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'wrapper][subwrapper1');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, '');
     $this->assertEqual($remote->tjiid, $item->tjiid);
 
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'no_label');
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'no_label');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, '');
@@ -248,8 +255,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertResponse(200);
     $this->assertTrue(empty($out));
 
-    entity_get_controller('tmgmt_remote')->resetCache();
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'wrapper][subwrapper1');
+    Drupal::entityManager()->getStorageController('tmgmt_remote')->resetCache();
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'wrapper][subwrapper1');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, $gengo_job->job_id);
@@ -258,7 +265,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertEqual($remote->remote_data['tier'], $gengo_job->tier);
   }
 
-  function testOrderModePollJob() {
+  public function testOrderModePollJob() {
     variable_set('tmgmt_mygengo_test_order_mode', 1);
     $this->loginAsAdmin();
     $this->translator->settings['api_public_key'] = 'correct key';
@@ -311,13 +318,13 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertText(t('All available translations from Gengo have been polled.'));
 
     // Check the updated mappings of item 1.
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid);
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid);
     $this->assertEqual(count($remotes), 2, '2 remotes for item 1');
 
     $gengo_job = $orders[$order_id][$job->tjid . '][' . $item->tjiid . '][body'];
 
-    entity_get_controller('tmgmt_remote')->resetCache();
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'body');
+    Drupal::entityManager()->getStorageController('tmgmt_remote')->resetCache();
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'body');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, $gengo_job->job_id);
@@ -326,12 +333,12 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertEqual($remote->remote_data['tier'], $gengo_job->tier);
 
     // And item 2.
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item2->tjiid);
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item2->tjiid);
     $this->assertEqual(count($remotes), 3, '3 remotes for item 2');
     $gengo_job = $orders[$order_id][$job->tjid . '][' . $item2->tjiid . '][body'];
 
-    entity_get_controller('tmgmt_remote')->resetCache();
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item2->tjiid, 'body');
+    Drupal::entityManager()->getStorageController('tmgmt_remote')->resetCache();
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item2->tjiid, 'body');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, $gengo_job->job_id);
@@ -340,7 +347,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertEqual($remote->remote_data['tier'], $gengo_job->tier);
   }
 
-  function testAvailableStatus() {
+  public function testAvailableStatus() {
     $this->loginAsAdmin();
 
     // Make sure we have correct keys.
@@ -369,7 +376,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $job->requestTranslation();
 
     // Make sure machine translation was received.
-    entity_get_controller('tmgmt_job_item')->resetCache();
+    Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
     $items = $job->getItems();
     $item = end($items);
     $data = $item->getData();
@@ -394,7 +401,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $job->requestTranslation();
 
     // See if available translation from gengo has updated our translation.
-    entity_get_controller('tmgmt_job_item')->resetCache();
+    Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
     $items = $job->getItems();
     $item = end($items);
     $data = $item->getData();
@@ -405,7 +412,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
   /**
    * Tests that duplicated strings can be translated correctly.
    */
-  function testDuplicateStrings() {
+  public function testDuplicateStrings() {
     $this->loginAsAdmin();
 
     // Make sure we have correct keys.
@@ -454,7 +461,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $job->requestTranslation();
 
     // Make sure the duplicated and not duplicated texts are translated.
-    entity_get_controller('tmgmt_job_item')->resetCache();
+    Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
     list($item1, $item2) = array_values($job->getItems());
 
     // Item 1.
@@ -470,11 +477,10 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertEqual('mt_de_Not duplicate but same key', $data['wrapper']['duplicate1']['#translation']['#text']);
   }
 
-  function testComments() {
+  public function testComments() {
     $this->loginAsAdmin();
 
     // Create job with two job items.
-
     $this->translator->settings['api_public_key'] = 'correct key';
     $this->translator->settings['api_private_key'] = 'correct key';
     $this->translator->save();
@@ -511,7 +517,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $job->requestTranslation();
 
     // Get mapping for first data item of second job item -> Title "Nice day".
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'title');
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'title');
     $remote = reset($remotes);
 
     $this->drupalPostAJAX('admin/tmgmt/items/' . $item->tjiid, array(), array($remote->remote_identifier_2 . '_comment_form' => '✉'));
@@ -525,7 +531,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     // Put first data item (Title "Nice day") into translated status so we can
     // request a revision.
-    /* @var TMGMTMyGengoTranslatorPluginController $plugin */
+    /* @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $plugin */
     $plugin = $job->getTranslatorController();
     $data = new stdClass();
     $data->status = 'reviewable';
@@ -547,7 +553,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertText($comment);
   }
 
-  function testPollJob() {
+  public function testPollJob() {
     $this->loginAsAdmin();
     $this->translator->settings['api_public_key'] = 'correct key';
     $this->translator->settings['api_private_key'] = 'correct key';
@@ -585,7 +591,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertText(t('All available translations from Gengo have been polled.'));
 
     // Reload item data.
-    entity_get_controller('tmgmt_job_item')->resetCache();
+    Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
     $item = tmgmt_job_item_load($item->tjiid);
     $item_data = $item->getData();
 
@@ -597,7 +603,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertEqual($item_data['body']['#status'], TMGMT_DATA_ITEM_STATE_PENDING);
   }
 
-  function testGengoCheckoutForm() {
+  public function testGengoCheckoutForm() {
     $this->loginAsAdmin();
 
     $this->translator->settings['api_public_key'] = 'correct key';
@@ -630,7 +636,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $this->assertTrue(strpos($word_count[0]->asXML(), '4') !== FALSE);
 
     $remaining_credit = $this->xpath('//div[@id=:id]', array(':id' => 'edit-settings-quote-remaining-credits'));
-    // The account balance service returns static value of 25.32 USD
+    // The account balance service returns static value of 25.32 USD.
     $this->assertTrue(strpos($remaining_credit[0]->asXML(), '25.32 USD') !== FALSE);
 
     $eta = $this->xpath('//div[@id=:id]', array(':id' => 'edit-settings-quote-eta'));
@@ -638,8 +644,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $out = $eta[0]->asXML();
     // Check both cases to prevent case when we are here at the minute border
     // and one second ahead of the page render.
-    $check_1 = strpos($out, format_date(time() + 60*60*24, "long")) !== FALSE;
-    $check_2 = strpos($out, format_date((time() + 60*60*24) - 1, "long")) !== FALSE;
+    $check_1 = strpos($out, format_date(time() + 60 * 60 * 24, "long")) !== FALSE;
+    $check_2 = strpos($out, format_date((time() + 60 * 60 * 24) - 1, "long")) !== FALSE;
     $this->assertTrue($check_1 || $check_2);
 
   }
