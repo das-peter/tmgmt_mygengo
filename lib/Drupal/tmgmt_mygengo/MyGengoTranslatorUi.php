@@ -7,6 +7,7 @@
 
 namespace Drupal\tmgmt_mygengo;
 
+use Drupal;
 use Drupal\tmgmt\TranslatorPluginUiBase;
 use Drupal\tmgmt\Plugin\Core\Entity\Job;
 use Drupal\tmgmt\Plugin\Core\Entity\JobItem;
@@ -424,15 +425,15 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
    *   Associative array of currency and credits.
    */
   protected function getRemainingCreditInfo(Translator $translator) {
-    $connector = new GengoConnector($translator);
+    $connector = new GengoConnector($translator, Drupal::httpClient());
     $credit_info = array(
       'credits' => NULL,
       'currency' => NULL,
     );
     try {
       $response = $connector->getRemainingCredit();
-      $credit_info['credits'] = $response->credits;
-      $credit_info['currency'] = $response->currency;
+      $credit_info['credits'] = $response['credits'];
+      $credit_info['currency'] = $response['currency'];
     }
     catch (TMGMTException $e) {
       watchdog_exception('tmgmt_mygengo', $e);
@@ -467,7 +468,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
     // Machine translation is always available.
     $available_tiers['machine'] = $tier_names['machine'];
 
-    $connector = new GengoConnector($translator);
+    $connector = new GengoConnector($translator, Drupal::httpClient());
     $gengo_language_pairs = array();
 
     try {
@@ -480,14 +481,14 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
 
     foreach ($gengo_language_pairs as $tier) {
       // Skip if for other language pairs.
-      if ($tier->lc_src != $translator->mapToRemoteLanguage($job->source_language) || $tier->lc_tgt != $translator->mapToRemoteLanguage($job->target_language)) {
+      if ($tier['lc_src'] != $translator->mapToRemoteLanguage($job->source_language) || $tier['lc_tgt'] != $translator->mapToRemoteLanguage($job->target_language)) {
         continue;
       }
 
-      $available_tiers[$tier->tier] = t('@tier (@cost @currency per word)', array(
-        '@tier' => empty($tier_names[$tier->tier]) ? $tier->tier : $tier_names[$tier->tier],
-        '@cost' => number_format($tier->unit_price, 2),
-        '@currency' => $tier->currency,
+      $available_tiers[$tier['tier']] = t('@tier (@cost @currency per word)', array(
+        '@tier' => empty($tier_names[$tier['tier']]) ? $tier['tier'] : $tier_names[$tier['tier']],
+        '@cost' => number_format($tier['unit_price'], 2),
+        '@currency' => $tier['currency'],
       ));
     }
 
@@ -517,20 +518,20 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   public function fetchComments(Translator $translator, $gengo_job_id, $reload = FALSE) {
 
     $cid = 'tmgmt_mygengo_comments_' . $gengo_job_id;
-    $cache = cache_get($cid, 'cache_tmgmt');
+    $cache = cache('tmgmt')->get($cid);
 
     if (isset($cache->data) && !$reload && $cache->expire > REQUEST_TIME) {
       return $cache->data;
     }
 
-    $connector = new GengoConnector($translator);
+    $connector = new GengoConnector($translator, Drupal::httpClient());
     $response = NULL;
 
     try {
       $response = $connector->getComments($gengo_job_id);
 
-      $data = isset($response->thread) ? $response->thread : NULL;
-      cache_set($cid, $data, 'cache_tmgmt', REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
+      $data = isset($response['thread']) ? $response['thread'] : NULL;
+      cache('tmgmt')->set($cid, $data, REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
       return $data;
     }
     catch (TMGMTException $e) {

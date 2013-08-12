@@ -7,6 +7,7 @@
 
 namespace Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator;
 
+use Drupal;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\tmgmt\Plugin\Core\Entity\Job;
 use Drupal\tmgmt\Plugin\Core\Entity\Translator;
@@ -158,7 +159,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
     try {
       $connector = new GengoConnector($translator, $this->client);
       foreach ($connector->getLanguages() as $gengo_language) {
-        $this->supportedRemoteLanguages[$gengo_language->lc] = $gengo_language->lc;
+        $this->supportedRemoteLanguages[$gengo_language['lc']] = $gengo_language['lc'];
       }
     }
     catch (TMGMTException $e) {
@@ -178,7 +179,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
     $connector = new GengoConnector($translator, $this->client);
     $response = $connector->getLanguages($translator->mapToRemoteLanguage($source_language));
     foreach ($response as $target) {
-      $results[$translator->mapToLocalLanguage($target->lc)] = $translator->mapToLocalLanguage($target->lc);
+      $results[$translator->mapToLocalLanguage($target['lc'])] = $translator->mapToLocalLanguage($target['lc']);
     }
 
     return $results;
@@ -247,11 +248,11 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
     else {
       $response = $connector->submitJob($translations);
       // If we already receive jobs, process them.
-      if (!empty($response->jobs)) {
-        $this->processGengoJobsUponTranslationRequest($job, $response->jobs, $duplicates);
+      if (!empty($response['jobs'])) {
+        $this->processGengoJobsUponTranslationRequest($job, $response['jobs'], $duplicates);
       }
-      elseif (isset($response->order_id)) {
-        $this->initGengoMapping($job, $response->order_id, $translations, $duplicates);
+      elseif (isset($response['order_id'])) {
+        $this->initGengoMapping($job, $response['order_id'], $translations, $duplicates);
       }
       return $response;
     }
@@ -268,14 +269,14 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    *   Translated data received from gengo.
    */
   public function saveTranslation(Job $job, $key, $data) {
-    if ($data->status == 'approved' || $data->status == 'reviewable') {
+    if ($data['status'] == 'approved' || $data['status'] == 'reviewable') {
       // If the status is approved or reviewable, we expect a body_tgt property,
       // abort and log if it doesn't exist.
-      if (!isset($data->body_tgt)) {
-        $job->addMessage('Callback called for @key and status @status without translation.', array('@key' => $data->custom_data, '@status' => $data->status));
+      if (!isset($data['body_tgt'])) {
+        $job->addMessage('Callback called for @key and status @status without translation.', array('@key' => $data['custom_data'], '@status' => $data['status']));
         return;
       }
-      $job->addTranslatedData(array('#text' => $data->body_tgt), $key);
+      $job->addTranslatedData(array('#text' => $data['body_tgt']), $key);
 
       // Look for duplicated strings that were saved with a mapping to this key.
       // @todo: Refactor this method to accept the remote instead of $key?
@@ -285,7 +286,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       if ($remote && !empty($remote->remote_data['duplicates'])) {
         // If we found any mappings, also add the translation for those.
         foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
-          $job->addTranslatedData(array('#text' => $data->body_tgt), $duplicate_key);
+          $job->addTranslatedData(array('#text' => $data['body_tgt']), $duplicate_key);
         }
       }
     }
@@ -310,7 +311,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
     foreach ($response_jobs as $key => $response_job) {
 
       // Duplicate content has been submitted.
-      if (isset($response_job->duplicate)) {
+      if (isset($response_job['duplicate'])) {
         // @todo Currently handled manually, so this should never occur.
         continue;
       }
@@ -318,7 +319,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // For machine translations the job is not wrapped in another object
       // however for human translations it is. So try to cope with this
       // gengo system variety.
-      if (!isset($response_job->custom_data)) {
+      if (!empty($response_job['custom_data'])) {
         $response_job = reset($response_job);
       }
 
@@ -328,7 +329,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // @todo - this is just a quick fix so that we can finish job submission
       // in such case. But not a solution as we end up with not mapped jobs
       // at gengo. This should be fixed in #2022147.
-      if ($response_job->status == 'held') {
+      if ($response_job['status'] == 'held') {
         continue;
       }
 
@@ -338,7 +339,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // receive numeric keys, so try to set some custom data to increase the
       // chance of matching the job.
       if (is_numeric($key)) {
-        $key = $response_job->custom_data;
+        $key = $response_job['custom_data'];
       }
 
       // Extract job item id and data item key.
@@ -350,11 +351,11 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       $item->addRemoteMapping($data_item_key, NULL, array(
         // Yes, this is not a joke, they really return string value "NULL" in
         // case of a machine translation.
-        'remote_identifier_2' => $response_job->job_id == 'NULL' ? 0 : $response_job->job_id,
-        'word_count' => $response_job->unit_count,
+        'remote_identifier_2' => $response_job['job_id'] == 'NULL' ? 0 : $response_job['job_id'],
+        'word_count' => $response_job['unit_count'],
         'remote_data' => array(
-          'credits' => $response_job->credits,
-          'tier' => $response_job->tier,
+          'credits' => $response_job['credits'],
+          'tier' => $response_job['tier'],
           'duplicates' => isset($duplicates[$item_id_data_key]) ? $duplicates[$item_id_data_key] : array(),
         ),
       ));
@@ -423,27 +424,27 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       try {
         $response = $connector->getOrder($gorder_id);
         // No jobs yet created at Gengo side. Nothing to do.
-        if ($response->order->jobs_queued == $response->order->total_jobs) {
+        if ($response['order']['jobs_queued'] == $response['order']['total_jobs']) {
           return;
         }
 
         // Collect job ids of that job. Use array_merge() as we have numerical
         // array keys.
         $order_job_ids = array();
-        if (!empty($response->order->jobs_available)) {
-          $order_job_ids = array_merge($order_job_ids, $response->order->jobs_available);
+        if (!empty($response['order']['jobs_available'])) {
+          $order_job_ids = array_merge($order_job_ids, $response['order']['jobs_available']);
         }
-        if (!empty($response->order->jobs_pending)) {
-          $order_job_ids = array_merge($order_job_ids, $response->order->jobs_pending);
+        if (!empty($response['order']['jobs_pending'])) {
+          $order_job_ids = array_merge($order_job_ids, $response['order']['jobs_pending']);
         }
-        if (!empty($response->order->jobs_reviewable)) {
-          $order_job_ids = array_merge($order_job_ids, $response->order->jobs_reviewable);
+        if (!empty($response['order']['jobs_reviewable'])) {
+          $order_job_ids = array_merge($order_job_ids, $response['order']['jobs_reviewable']);
         }
-        if (!empty($response->order->jobs_approved)) {
-          $order_job_ids = array_merge($order_job_ids, $response->order->jobs_approved);
+        if (!empty($response['order']['jobs_approved'])) {
+          $order_job_ids = array_merge($order_job_ids, $response['order']['jobs_approved']);
         }
-        if (!empty($response->order->jobs_revising)) {
-          $order_job_ids = array_merge($order_job_ids, $response->order->jobs_revising);
+        if (!empty($response['order']['jobs_revising'])) {
+          $order_job_ids = array_merge($order_job_ids, $response['order']['jobs_revising']);
         }
 
         // Keep a record of new job ids and their mappings and add them to the
@@ -466,18 +467,18 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
 
     // Gengo did not provide any mapping data, do nothing.
     // This only happens in the case that Gengo is unreachable.
-    if (empty($response->jobs)) {
+    if (empty($response['jobs'])) {
       return;
     }
 
     // Update mappings and save any translations.
-    foreach ($response->jobs as $key => $response_job) {
+    foreach ($response['jobs'] as $key => $response_job) {
       // Extract job item id and data item key.
-      list(, $tjiid, $data_item_key) = explode('][', $response_job->custom_data, 3);
+      list(, $tjiid, $data_item_key) = explode('][', $response_job['custom_data'], 3);
 
       // If this is a new job, look for a remote mapping based on the data item
       // key and update it.
-      if (isset($new_job_ids[$response_job->job_id])) {
+      if (isset($new_job_ids[$response_job['job_id']])) {
 
         $matching_remote = NULL;
         foreach ($remotes as $remote) {
@@ -490,23 +491,23 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         // We don't have a remote mapping yet, create one.
         if (!$matching_remote) {
           $item = tmgmt_job_item_load($tjiid);
-          $item->addRemoteMapping($data_item_key, $new_job_ids[$response_job->job_id], array(
-            'remote_identifier_2' => $response_job->job_id,
-            'word_count' => $response_job->unit_count,
+          $item->addRemoteMapping($data_item_key, $new_job_ids[$response_job['job_id']], array(
+            'remote_identifier_2' => $response_job['job_id'],
+            'word_count' => $response_job['unit_count'],
             'remote_data' => array(
-              'credits' => $response_job->credits,
-              'tier' => $response_job->tier,
+              'credits' => $response_job['credits'],
+              'tier' => $response_job['tier'],
             ),
             // @todo: Add remote_url.
           ));
         }
         // We have a mapping, update it.
         else {
-          $matching_remote->remote_identifier_2 = $response_job->job_id;
-          $matching_remote->word_count = $response_job->unit_count;
+          $matching_remote->remote_identifier_2 = $response_job['job_id'];
+          $matching_remote->word_count = $response_job['unit_count'];
           $matching_remote->remote_data = array(
-            'credits' => $response_job->credits,
-            'tier' => $response_job->tier,
+            'credits' => $response_job['credits'],
+            'tier' => $response_job['tier'],
           );
           $matching_remote->save();
         }

@@ -5,6 +5,9 @@
  * Module file of the translation management Gengo test module.
  */
 
+use Drupal\Component\Utility\Json;
+use Symfony\Component\HttpFoundation\JsonResponse;
+
 /**
  * Implements hook_menu().
  */
@@ -76,7 +79,7 @@ function tmgmt_mygengo_test_service_job($gengo_job_id) {
   $data = array();
   parse_str(file_get_contents('php://input'), $data);
 
-  $data = drupal_json_decode($data['data']);
+  $data = Json::decode($data['data']);
 
   if ($data['action'] == 'revise') {
 
@@ -90,7 +93,7 @@ function tmgmt_mygengo_test_service_job($gengo_job_id) {
     variable_set('tmgmt_mygengo_test_comments', $comments);
   }
 
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => '',
   ));
@@ -100,7 +103,7 @@ function tmgmt_mygengo_test_service_job($gengo_job_id) {
  * Mock service to return previously submitted jobs.
  */
 function tmgmt_mygengo_test_service_jobs_get() {
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => variable_get('tmgmt_mygengo_test_last_gengo_response'),
   ));
@@ -121,15 +124,15 @@ function tmgmt_mygengo_test_service_order_get($order_id) {
       'total_jobs' => count($orders[$order_id]),
     );
     foreach ($orders[$order_id] as $job) {
-      $order->jobs_available[] = $job->job_id;
+      $order->jobs_available[] = $job['job_id'];
     }
-    drupal_json_output(array(
+    return new JsonResponse(array(
       'opstat' => 'ok',
       'response' => array('order' => $order),
     ));
     return;
   }
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'error',
     'err' => array('code' => 123, 'msg' => 'Order id ' . $order_id . ' does not exist'),
   ));
@@ -138,12 +141,12 @@ function tmgmt_mygengo_test_service_order_get($order_id) {
 /**
  * Mock service call to create a comment.
  *
- * @param $gengo_job_id
+ * @param int $gengo_job_id
  *   Remote job id.
  */
 function tmgmt_mygengo_test_service_comment_create($gengo_job_id) {
   $comment = new stdClass();
-  $data = drupal_json_decode($_POST['data']);
+  $data = Json::decode($_POST['data']);
   $comment->body = $data['body'];
   $comment->ctime = REQUEST_TIME;
   $comment->author = 'yogi bear';
@@ -152,7 +155,7 @@ function tmgmt_mygengo_test_service_comment_create($gengo_job_id) {
   $comments[$gengo_job_id][] = $comment;
   variable_set('tmgmt_mygengo_test_comments', $comments);
 
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => array(),
   ));
@@ -161,7 +164,7 @@ function tmgmt_mygengo_test_service_comment_create($gengo_job_id) {
 /**
  * Mock service call to fetch remote comments.
  *
- * @param $gengo_job_id
+ * @param int $gengo_job_id
  *   Remote job id.
  */
 function tmgmt_mygengo_test_service_comments_get($gengo_job_id) {
@@ -173,7 +176,7 @@ function tmgmt_mygengo_test_service_comments_get($gengo_job_id) {
 
   $response->thread = $comments[$gengo_job_id];
 
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => $response,
   ));
@@ -186,7 +189,7 @@ function tmgmt_mygengo_test_service_account_balance() {
   $balance = new stdClass();
   $balance->credits = 25.32;
   $balance->currency = 'USD';
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => $balance,
   ));
@@ -212,7 +215,7 @@ function tmgmt_mygengo_test_service_get_languages() {
   // Remote source language.
   unset($languages[$_GET['lc_src']]);
 
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => $languages,
   ));
@@ -241,7 +244,7 @@ function tmgmt_mygengo_test_service_get_language_pairs() {
   $pair->unit_price = '0.1500';
   $pairs[] = $pair;
 
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => $pairs,
   ));
@@ -261,18 +264,18 @@ function tmgmt_mygengo_test_service_get_quote() {
   $quote->jobs[0] = new stdClass();
   $quote->jobs[0]->unit_count = 2;
   $quote->jobs[0]->credits = 2;
-  $quote->jobs[0]->eta = 60*60*24; // One day.
+  $quote->jobs[0]->eta = 60 * 60 * 24; // One day.
   $quote->jobs[0]->type = 'text';
   $quote->jobs[0]->currency = 'USD';
 
   $quote->jobs[1] = new stdClass();
   $quote->jobs[1]->unit_count = 2;
   $quote->jobs[1]->credits = 2;
-  $quote->jobs[1]->eta = 60*60*24; // One day.
+  $quote->jobs[1]->eta = 60 * 60 * 24; // One day.
   $quote->jobs[1]->type = 'text';
   $quote->jobs[1]->currency = 'USD';
 
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => $quote,
   ));
@@ -283,7 +286,9 @@ function tmgmt_mygengo_test_service_get_quote() {
  */
 function tmgmt_mygengo_test_service_translate() {
 
-  tmgmt_mygengo_test_authenticate();
+  if ($error_response = tmgmt_mygengo_test_authenticate()) {
+    return $error_response;
+  }
 
   $response = new stdClass();
 
@@ -291,33 +296,33 @@ function tmgmt_mygengo_test_service_translate() {
 
   // Use case when jobs have been submitted to gengo.
   if (!empty($_POST['data'])) {
-    $data = json_decode($_POST['data']);
+    $data = Json::decode($_POST['data']);
 
-    foreach ($data->jobs as $id => $job) {
+    foreach ($data['jobs'] as $id => $job) {
 
       // Simulate API behavior to ignore multiple jobs with the same source.
-      if (array_search($job->body_src, $sources)) {
+      if (array_search($job['body_src'], $sources)) {
         continue;
       }
 
       // Keep track of source strings.
-      $sources[$id] = $job->body_src;
+      $sources[$id] = $job['body_src'];
 
       // Machine translation - simulate returning translation job right away.
-      if ($job->tier == 'machine') {
-        $body_tgt = 'mt_de_' . $job->body_src;
-        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'approved', $job->tier, $job->custom_data, $job->slug, $job->position);
+      if ($job['tier'] == 'machine') {
+        $body_tgt = 'mt_de_' . $job['body_src'];
+        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job['body_src'], $body_tgt, 'approved', $job['tier'], $job['custom_data'], $job['slug'], $job['position']);
       }
       // Hack to tell mock service that translation should be returned right
       // away as available.
-      elseif (strpos($job->body_src, 'Lazy-Loading') !== FALSE) {
-        $body_tgt = str_replace('Lazy-Loading', 'Translated', $job->body_src);
-        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, $body_tgt, 'available', $job->tier, $job->custom_data, $job->slug, $job->position);
+      elseif (strpos($job['body_src'], 'Lazy-Loading') !== FALSE) {
+        $body_tgt = str_replace('Lazy-Loading', 'Translated', $job['body_src']);
+        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job['body_src'], $body_tgt, 'available', $job['tier'], $job['custom_data'], $job['slug'], $job['position']);
       }
       // Otherwise we have submitted a job, however just return the job object
       // without translation and in pending state.
       else {
-        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job->body_src, NULL, 'pending', $job->tier, $job->custom_data, $job->slug, $job->position);
+        $response->jobs[$id] = tmgmt_mygengo_test_build_response_job($job['body_src'], NULL, 'pending', $job['tier'], $job['custom_data'], $job['slug'], $job['position']);
       }
     }
 
@@ -343,7 +348,7 @@ function tmgmt_mygengo_test_service_translate() {
 
   // @todo To fix tests I believe this has to be changed in some cases. Just
   //   return the $response not the structure.
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'ok',
     'response' => $response,
   ));
@@ -354,28 +359,34 @@ function tmgmt_mygengo_test_service_translate() {
  */
 function tmgmt_mygengo_test_build_response_job($body_src, $body_tgt, $status, $tier, $custom_data, $slug, $position = 0) {
 
-  $job = new stdClass();
-  $job->lc_src = 'en';
-  $job->lc_tgt = 'de';
-  $job->body_src = $body_src;
-  $job->unit_count = str_word_count($job->body_src);
+  $job = array();
+  $job['lc_src'] = 'en';
+  $job['lc_tgt'] = 'de';
+  $job['body_src'] = $body_src;
+  $job['unit_count'] = str_word_count($job['body_src']);
   // Fake credit calculation.
-  $job->credits = $job->unit_count * .4;
-  $job->status = $status;
-  $job->tier = $tier;
-  $job->custom_data = $custom_data;
-  $job->slug = $slug;
-  $job->job_id = rand(1, 100);
-  $job->status = NULL;
-  $job->position = $position;
+  $job['credits'] = $job['unit_count'] * .4;
+  $job['status'] = $status;
+  $job['tier'] = $tier;
+  $job['slug'] = $slug;
+  $job['job_id'] = rand(1, 100);
+  $job['position'] = $position;
 
   if (!empty($body_tgt)) {
-    $job->status = 'approved';
+    $job['status'] = 'approved';
   }
 
   // Add translation if available.
   if (!empty($body_tgt)) {
-    $job->body_tgt = $body_tgt;
+    $job['body_tgt'] = $body_tgt;
+  }
+
+  // For machine translations the job is not wrapped in another object
+  // however for human translations it is. So try to reproduce this gengo
+  // system variety.
+  if ($job['tier'] != 'machine') {
+    $job['custom_data'] = $custom_data;
+    $job = array_merge(array($custom_data => $job), $job);
   }
 
   return $job;
@@ -386,20 +397,17 @@ function tmgmt_mygengo_test_build_response_job($body_src, $body_tgt, $status, $t
  */
 function tmgmt_mygengo_test_authenticate() {
 
-  if ($_REQUEST['api_key'] == 'correct key') {
+  if (isset($_REQUEST['api_key']) && $_REQUEST['api_key'] == 'correct key') {
     $sig = hash_hmac('sha1', $_REQUEST['ts'], 'correct key');
     if ($sig == $_REQUEST['api_sig']) {
       return;
     }
   }
 
-  drupal_json_output(array(
+  return new JsonResponse(array(
     'opstat' => 'failure',
     // We do not really need a response here.
     'response' => '',
-    'err' => array(array((object)array('msg' => 'Authentication failure', 'code' => 100))),
+    'err' => array(array((object) array('msg' => 'Authentication failure', 'code' => 100))),
   ));
-
-  // In case of error we do not want to continue.
-  drupal_exit();
 }

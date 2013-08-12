@@ -315,7 +315,7 @@ class GengoConnector {
         ), $data);
 
         $url = url($url, array('query' => $query, 'absolute' => TRUE));
-        $response = $this->client->createRequest($method, $url, $headers)->send();
+        $request = $this->client->createRequest($method, $url, $headers);
       }
       else {
         $headers['Content-Type'] = 'application/x-www-form-urlencoded';
@@ -327,8 +327,13 @@ class GengoConnector {
         ));
 
         $url = url($url, array('absolute' => TRUE));
-        $response = $this->client->createRequest($method, $url, $headers, $data)->send();
+        $request = $this->client->createRequest($method, $url, $headers, $data);
       }
+
+      if (variable_get('tmgmt_mygengo_use_mock_service', FALSE) && isset($_COOKIE['XDEBUG_SESSION'])) {
+        $request->addCookie('XDEBUG_SESSION', $_COOKIE['XDEBUG_SESSION']);
+      }
+      $response = $request->send();
 
       if ($this->debug == TRUE) {
         watchdog('tmgmt_mygengo', "Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
@@ -353,22 +358,22 @@ class GengoConnector {
 
     $results = $response->json();
 
-    if ($results->opstat == 'ok' && isset($results->response)) {
-      return $results->response;
+    if ($results['opstat'] == 'ok' && isset($results['response'])) {
+      return $results['response'];
     }
 
     // Find if we have only one error or multiple.
-    if (isset($results->err->code)) {
-      $gengo_err = $results->err;
+    if (isset($results['err']['code'])) {
+      $gengo_err = $results['err'];
     }
     // In case of multiple, take only the first one - they are usually the same.
     // @todo Handle multiple errors received from gengo.
     else {
-      $gengo_err = reset($results->err);
+      $gengo_err = reset($results['err']);
       $gengo_err = array_shift($gengo_err);
     }
 
-    throw new TMGMTException(t('Gengo service returned error #@code @error'), array('@error' => $gengo_err->msg, '@code' => $gengo_err->code));
+    throw new TMGMTException(t('Gengo service returned error #@code @error'), array('@error' => $gengo_err['msg'], '@code' => $gengo_err['code']));
   }
 
 

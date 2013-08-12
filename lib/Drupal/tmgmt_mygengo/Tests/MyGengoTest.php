@@ -7,6 +7,8 @@
 
 namespace Drupal\tmgmt_mygengo\Tests;
 
+use Drupal;
+use Drupal\Component\Utility\Json;
 use Drupal\tmgmt\Tests\TMGMTTestBase;
 
 /**
@@ -59,7 +61,7 @@ class MyGengoTest extends TMGMTTestBase {
 
     // The translator should not be available at this poitn because we didn't
     // define an API key yet.
-    $this->assertFalse($job->isTranslatable());
+    $this->assertFalse($job->canRequestTranslation());
 
     // Save a wrong api key.
     $this->translator->settings['api_public_key'] = 'wrong key';
@@ -74,7 +76,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertFalse(isset($languages['en']));
 
     // @todo Actually check if the api key is valid.
-    $this->assertTrue($job->isTranslatable());
+    $this->assertTrue($job->canRequestTranslation());
     $job->requestTranslation();
 
     // Should have been rejected due to the wrong api key.
@@ -89,7 +91,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->translator->settings['api_public_key'] = 'correct key';
     $this->translator->settings['api_private_key'] = 'correct key';
     $this->translator->save();
-    $this->assertTrue($job->isTranslatable());
+    $this->assertTrue($job->canRequestTranslation());
 
     // Note that requesting translation goes with default
     // gengo_auto_approve = 1
@@ -101,7 +103,7 @@ class MyGengoTest extends TMGMTTestBase {
     }
 
     // Create a gengo response of translated and approved job.
-    $post['job'] = json_encode(tmgmt_mygengo_test_build_response_job(
+    $post['job'] = Json::encode(tmgmt_mygengo_test_build_response_job(
       'Hello world',
       'Hallo Welt',
       'approved',
@@ -127,7 +129,7 @@ class MyGengoTest extends TMGMTTestBase {
     $jobs = $data->jobs;
     $job_keys = array_keys($jobs);
     $key = array_shift($job_keys);
-    $this->assertEqual($data->jobs[$key]->slug, $item->data['wrapper']['#label']);
+    $this->assertEqual($data->jobs[$key]['slug'], $item->data['wrapper']['#label']);
 
     // Now it should be needs review.
     foreach ($job->getItems() as $item) {
@@ -182,13 +184,13 @@ class MyGengoTest extends TMGMTTestBase {
 
     $subwrapper1_key = $job->tjid . '][' . $item->tjiid . '][wrapper][subwrapper1';
     $no_label_key = $job->tjid . '][' . $item->tjiid . '][no_label';
-    $this->assertEqual($jobs[$subwrapper1_key]->slug, 'Parent label > Sub label 1');
-    $this->assertEqual($jobs[$no_label_key]->slug, 'No label');
+    $this->assertEqual($jobs[$subwrapper1_key]['slug'], 'Parent label > Sub label 1');
+    $this->assertEqual($jobs[$no_label_key]['slug'], 'No label');
 
     // Test positions.
     $position = 0;
     foreach ($jobs as $response_job) {
-      $this->assertEqual($position++, $response_job->position);
+      $this->assertEqual($position++, $response_job['position']);
     }
   }
 
@@ -246,7 +248,7 @@ class MyGengoTest extends TMGMTTestBase {
 
     // Create a gengo response of the job.
     $gengo_job = $orders[$order_id][$job->tjid . '][' . $item->tjiid . '][wrapper][subwrapper1'];
-    $post['job'] = json_encode($gengo_job);
+    $post['job'] = Json::encode($gengo_job);
 
     $action = url('tmgmt_mygengo_callback', array('absolute' => TRUE));
     $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
@@ -259,10 +261,10 @@ class MyGengoTest extends TMGMTTestBase {
     $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'wrapper][subwrapper1');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, $gengo_job->job_id);
-    $this->assertEqual($remote->word_count, $gengo_job->unit_count);
-    $this->assertEqual($remote->remote_data['credits'], $gengo_job->credits);
-    $this->assertEqual($remote->remote_data['tier'], $gengo_job->tier);
+    $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
+    $this->assertEqual($remote->word_count, $gengo_job['unit_count']);
+    $this->assertEqual($remote->remote_data['credits'], $gengo_job['credits']);
+    $this->assertEqual($remote->remote_data['tier'], $gengo_job['tier']);
   }
 
   public function testOrderModePollJob() {
@@ -327,10 +329,10 @@ class MyGengoTest extends TMGMTTestBase {
     $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item->tjiid, 'body');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, $gengo_job->job_id);
-    $this->assertEqual($remote->word_count, $gengo_job->unit_count);
-    $this->assertEqual($remote->remote_data['credits'], $gengo_job->credits);
-    $this->assertEqual($remote->remote_data['tier'], $gengo_job->tier);
+    $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
+    $this->assertEqual($remote->word_count, $gengo_job['unit_count']);
+    $this->assertEqual($remote->remote_data['credits'], $gengo_job['credits']);
+    $this->assertEqual($remote->remote_data['tier'], $gengo_job['tier']);
 
     // And item 2.
     $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item2->tjiid);
@@ -341,10 +343,10 @@ class MyGengoTest extends TMGMTTestBase {
     $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $item2->tjiid, 'body');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, $gengo_job->job_id);
-    $this->assertEqual($remote->word_count, $gengo_job->unit_count);
-    $this->assertEqual($remote->remote_data['credits'], $gengo_job->credits);
-    $this->assertEqual($remote->remote_data['tier'], $gengo_job->tier);
+    $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
+    $this->assertEqual($remote->word_count, $gengo_job['unit_count']);
+    $this->assertEqual($remote->remote_data['credits'], $gengo_job['credits']);
+    $this->assertEqual($remote->remote_data['tier'], $gengo_job['tier']);
   }
 
   public function testAvailableStatus() {
@@ -533,9 +535,10 @@ class MyGengoTest extends TMGMTTestBase {
     // request a revision.
     /* @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $plugin */
     $plugin = $job->getTranslatorController();
-    $data = new stdClass();
-    $data->status = 'reviewable';
-    $data->body_tgt = 'Nice day translated';
+    $data = array(
+      'status' => 'reviewable',
+      'body_tgt' => 'Nice day translated',
+    );
     $key = $item->tjiid . '][' . $remote->data_item_key;
     $plugin->saveTranslation($job, $key, $data);
 
@@ -582,8 +585,8 @@ class MyGengoTest extends TMGMTTestBase {
     // gets translated.
     $data = variable_get('tmgmt_mygengo_test_last_gengo_response');
     $key = $job->tjid . '][' . $item->tjiid . '][title';
-    $data->jobs[$key]->status = 'approved';
-    $data->jobs[$key]->body_tgt = 'Title translated';
+    $data->jobs[$key]['status'] = 'approved';
+    $data->jobs[$key]['body_tgt'] = 'Title translated';
     variable_set('tmgmt_mygengo_test_last_gengo_response', $data);
 
     // Poll jobs from gengo.

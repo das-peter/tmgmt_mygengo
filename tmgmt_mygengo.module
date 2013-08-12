@@ -26,9 +26,11 @@
  *   completely or add some meaning full access control.
  */
 
+use Drupal\Component\Utility\Json;
 use Drupal\tmgmt_mygengo\GengoConnector;
 use Drupal\tmgmt\Plugin\Core\Entity\Job;
 use Drupal\tmgmt\Plugin\Core\Entity\JobItem;
+use Drupal\Core\Template\Attribute;
 
 define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
 
@@ -108,7 +110,7 @@ function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
   $form_state['active_gengo_job_id'] = NULL;
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
   /* @var JobItem $item */
-  $item = $form_state['item'];
+  $item = $form_state['controller']->getEntity();;
   $job = $item->getJob();
 
   try {
@@ -136,7 +138,7 @@ function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
   $form_state['active_gengo_job_id'] = NULL;
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
   /* @var JobItem $item */
-  $item = $form_state['item'];
+  $item = $form_state['controller']->getEntity();
   $job = $item->getJob();
 
   try {
@@ -197,13 +199,13 @@ function theme_tmgmt_mygengo_comments_thread($variables) {
   $i = 0;
 
   foreach ($thread as $comment) {
-    $zebra = ++$i%2 == 0 ? 'even' : 'odd';
+    $zebra = ++$i % 2 == 0 ? 'even' : 'odd';
 
-    $attributes = drupal_attributes(array('class' => array('gengo-comment-body', $zebra)));
+    $attributes = new Attribute(array('class' => array('gengo-comment-body', $zebra)));
 
     $comments[] = '<div class="gengo-comment-meta">' .
-        t('At %time by %author:', array('%time' => format_date($comment->ctime), '%author' => $comment->author)) .
-        '</div><div ' . $attributes . '>' . check_plain($comment->body) . '</div>';
+        t('At %time by %author:', array('%time' => format_date($comment['ctime']), '%author' => $comment['author'])) .
+        '</div><div ' . $attributes . '>' . check_plain($comment['body']) . '</div>';
   }
 
   return theme('item_list', array('items' => $comments)) . '<div class="comments-list-closing" id="' . $gengo_job_id . '-comments-list-closing"></div>';
@@ -221,7 +223,7 @@ function tmgmt_mygengo_theme() {
 }
 
 /**
- *  Implements hook_menu().
+ * Implements hook_menu().
  */
 function tmgmt_mygengo_menu() {
   $items['tmgmt_mygengo_callback'] = array(
@@ -241,7 +243,7 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
   /**
    * @var Job $job
    */
-  $job = $form_state['tmgmt_job'];
+  $job = $form_state['controller']->getEntity();
   /**
    * @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $controller
    */
@@ -253,7 +255,7 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
 
   // Clear comments cache.
   // @todo: Improve cache id to clear cache for this job item only?
-  cache_clear_all('tmgmt_mygengo_comments_', 'cache_tmgmt', TRUE);
+  cache('tmgmt')->deleteTags(array('tmgmt_mygengo_comments_' => TRUE));
 
   drupal_set_message(t('All available translations from Gengo have been polled.'));
 }
@@ -264,8 +266,8 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
 function tmgmt_mygengo_callback() {
   // First, check if this is a comment notification.
   if (isset($_POST['comment'])) {
-    $comment = json_decode($_POST['comment']);
-    cache_clear_all('tmgmt_mygengo_comments_' . $comment->job_id, 'cache_tmgmt');
+    $comment = Json::decode($_POST['comment']);
+    cache('tmgmt')->deleteTags(array('tmgmt_mygengo_comments_' . $comment['job_id'] => FALSE));
     return '';
   }
 
@@ -274,8 +276,8 @@ function tmgmt_mygengo_callback() {
     return MENU_NOT_FOUND;
   }
 
-  $data = json_decode($_POST['job']);
-  list($tjid, $tjiid, $data_item_key) = explode('][', $data->custom_data, 3);
+  $data = Json::decode($_POST['job']);
+  list($tjid, $tjiid, $data_item_key) = explode('][', $data['custom_data'], 3);
   $job = tmgmt_job_load($tjid);
   if (!$job) {
     watchdog('tmgmt_mygengo', 'Failed to load translation job for @data', array('@data' => var_export($data, TRUE)), WATCHDOG_WARNING);
@@ -289,20 +291,20 @@ function tmgmt_mygengo_callback() {
   if (!$remote) {
     $item = tmgmt_job_item_load($tjiid);
     $item->addRemoteMapping($data_item_key, NULL, array(
-      'remote_identifier_2' => $data->job_id,
-      'word_count' => $data->unit_count,
+      'remote_identifier_2' => $data['job_id'],
+      'word_count' => $data['unit_count'],
       'remote_data' => array(
-        'credits' => $data->credits,
-        'tier' => $data->tier,
+        'credits' => $data['credits'],
+        'tier' => $data['tier'],
       ),
       // @todo: Add remote_url.
     ));
   }
   elseif (empty($remote->remote_identifier_2)) {
-    $remote->remote_identifier_2 = $data->job_id;
-    $remote->word_count = $data->unit_count;
-    $remote->remote_data['credits'] = $data->credits;
-    $remote->remote_data['tier'] = $data->tier;
+    $remote->remote_identifier_2 = $data['job_id'];
+    $remote->word_count = $data['unit_count'];
+    $remote->remote_data['credits'] = $data['credits'];
+    $remote->remote_data['tier'] = $data['tier'];
     $remote->save();
   }
 
