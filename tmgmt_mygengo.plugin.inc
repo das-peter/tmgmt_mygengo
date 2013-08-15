@@ -163,7 +163,9 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
 
       $translations[$job->tjid . '][' . $key] = array(
         'type' => 'text',
-        'slug' => tmgmt_data_item_label($value),
+        // Labels that are longer than 56 characters are cut off in the Gengo
+        // dashboard, limit them to that size.
+        'slug' => tmgmt_data_item_label($value, 56),
         'body_src' => $value['#text'],
         'lc_src' => $translator->mapToRemoteLanguage($job->source_language),
         'lc_tgt' => $translator->mapToRemoteLanguage($job->target_language),
