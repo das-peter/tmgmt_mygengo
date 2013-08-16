@@ -120,7 +120,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     $jobs = $data->jobs;
     $job_keys = array_keys($jobs);
     $key = array_shift($job_keys);
-    $this->assertEqual($data->jobs[$key]->slug, $item->data['wrapper']['#label']);
+    $this->assertEqual($data->jobs[$key]->slug, $item->getSourceLabel() . ' > ' . $item->data['wrapper']['#label']);
 
     // Now it should be needs review.
     foreach ($job->getItems() as $item) {
@@ -175,8 +175,8 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     $subwrapper1_key = $job->tjid . '][' . $item->tjiid . '][wrapper][subwrapper1';
     $no_label_key = $job->tjid . '][' . $item->tjiid . '][no_label';
-    $this->assertEqual($jobs[$subwrapper1_key]->slug, 'Parent label > Sub label 1');
-    $this->assertEqual($jobs[$no_label_key]->slug, 'No label');
+    $this->assertEqual($jobs[$subwrapper1_key]->slug, $item->getSourceLabel() . ' > Parent label > Sub label 1');
+    $this->assertEqual($jobs[$no_label_key]->slug, $item->getSourceLabel());
 
     // Test positions.
     $position = 0;
