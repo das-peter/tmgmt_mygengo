@@ -152,6 +152,12 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
       'no_label' => array(
         '#text' => 'No label',
       ),
+      'escaping' => array(
+        '#text' => 'A text with a @placeholder',
+        '#escape' => array(
+          14 => array('string' => '@placeholder'),
+        )
+      ),
     );
     $item->save();
 
@@ -167,6 +173,7 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
     // mt_de_ to the source text.
     $this->assertEqual('mt_de_Hello world', $data['wrapper']['subwrapper1']['#translation']['#text']);
     $this->assertEqual('mt_de_Hello world again', $data['wrapper']['subwrapper2']['#translation']['#text']);
+    $this->assertEqual('mt_de_A text with a @placeholder', $data['escaping']['#translation']['#text']);
 
     // Verify generated labels/slugs.
     $this->refreshVariables();
@@ -175,8 +182,10 @@ class TMGMTMyGengoTestCase extends TMGMTBaseTestCase {
 
     $subwrapper1_key = $job->tjid . '][' . $item->tjiid . '][wrapper][subwrapper1';
     $no_label_key = $job->tjid . '][' . $item->tjiid . '][no_label';
+    $escaping_key = $job->tjid . '][' . $item->tjiid . '][escaping';
     $this->assertEqual($jobs[$subwrapper1_key]->slug, $item->getSourceLabel() . ' > Parent label > Sub label 1');
     $this->assertEqual($jobs[$no_label_key]->slug, $item->getSourceLabel());
+    $this->assertEqual($jobs[$escaping_key]->body_src, 'A text with a [[[@placeholder]]]');
 
     // Test positions.
     $position = 0;

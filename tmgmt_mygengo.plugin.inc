@@ -11,6 +11,16 @@
 class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPluginController {
 
   /**
+   * {@inheritdoc}
+   */
+  protected $escapeStart = '[[[';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $escapeEnd = ']]]';
+
+  /**
    * If set it will be sent by job post action as a comment.
    *
    * @var string
@@ -166,7 +176,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         // Labels that are longer than 56 characters are cut off in the Gengo
         // dashboard, limit them to that size.
         'slug' => tmgmt_data_item_label($value, 56),
-        'body_src' => $value['#text'],
+        'body_src' => $this->escapeText($value),
         'lc_src' => $translator->mapToRemoteLanguage($job->source_language),
         'lc_tgt' => $translator->mapToRemoteLanguage($job->target_language),
         'tier' => $job->settings['quality'],
@@ -219,7 +229,8 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
         $job->addMessage('Callback called for @key and status @status without translation.', array('@key' => $data->custom_data, '@status' => $data->status));
         return;
       }
-      $job->addTranslatedData(array('#text' => $data->body_tgt), $key);
+      $text = $this->unescapeText($data->body_tgt);
+      $job->addTranslatedData(array('#text' => $text), $key);
 
       // Look for duplicated strings that were saved with a mapping to this key.
       // @todo: Refactor this method to accept the remote instead of $key?
@@ -229,7 +240,7 @@ class TMGMTMyGengoTranslatorPluginController extends TMGMTDefaultTranslatorPlugi
       if ($remote && !empty($remote->remote_data['duplicates'])) {
         // If we found any mappings, also add the translation for those.
         foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
-          $job->addTranslatedData(array('#text' => $data->body_tgt), $duplicate_key);
+          $job->addTranslatedData(array('#text' => $text), $duplicate_key);
         }
       }
     }
