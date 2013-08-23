@@ -318,13 +318,12 @@ class GengoConnector {
         $request = $this->client->createRequest($method, $url, $headers);
       }
       else {
-        $headers['Content-Type'] = 'application/x-www-form-urlencoded';
-        $data = Url::buildQuery(array(
+        $data = array(
           'api_key' => $this->pubKey,
           'api_sig' => hash_hmac('sha1', $timestamp, $this->privateKey),
           'ts' => $timestamp,
           'data' => json_encode($data),
-        ));
+        );
 
         $url = url($url, array('absolute' => TRUE));
         $request = $this->client->createRequest($method, $url, $headers, $data);
@@ -345,12 +344,6 @@ class GengoConnector {
       }
     }
     catch (RequestException $e) {
-      $status_codes = Response::$statusTexts;
-      throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
-        array('@error' => $status_codes[$response->getStatusCode()], '@url' => $url));
-    }
-
-    if ($response->getStatusCode() != 200 && $response->getStatusCode() != 201) {
       $status_codes = Response::$statusTexts;
       throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
         array('@error' => $status_codes[$response->getStatusCode()], '@url' => $url));

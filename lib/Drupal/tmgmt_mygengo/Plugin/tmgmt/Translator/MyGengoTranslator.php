@@ -9,8 +9,8 @@ namespace Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator;
 
 use Drupal;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\tmgmt\Plugin\Core\Entity\Job;
-use Drupal\tmgmt\Plugin\Core\Entity\Translator;
+use Drupal\tmgmt\Entity\Job;
+use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
 use Drupal\tmgmt\TranslatorPluginBase;
 use Drupal\tmgmt\Annotation\TranslatorPlugin;

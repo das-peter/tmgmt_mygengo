@@ -9,9 +9,9 @@ namespace Drupal\tmgmt_mygengo;
 
 use Drupal;
 use Drupal\tmgmt\TranslatorPluginUiBase;
-use Drupal\tmgmt\Plugin\Core\Entity\Job;
-use Drupal\tmgmt\Plugin\Core\Entity\JobItem;
-use Drupal\tmgmt\Plugin\Core\Entity\Translator;
+use Drupal\tmgmt\Entity\Job;
+use Drupal\tmgmt\Entity\JobItem;
+use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
 
 /**
