@@ -6,7 +6,7 @@
 
 namespace Drupal\tmgmt_mygengo;
 
-use Drupal\tmgmt\Plugin\Core\Entity\Translator;
+use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
 use Drupal\Component\Utility\Url;
 use Guzzle\Http\ClientInterface;
@@ -61,7 +61,7 @@ class GengoConnector {
   /**
    * Construct the connector to gengo service.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Translator $translator
+   * @param \Drupal\tmgmt\Entity\Translator $translator
    *   Translator which has the connection settings.
    */
   public function __construct(Translator $translator, ClientInterface $client) {

@@ -188,7 +188,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * Will build and send a job to gengo service.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
+   * @param \Drupal\tmgmt\Entity\Job $job
    *   Job to be submitted for translation.
    * @param bool $quote_only
    *   (Optional) Set to TRUE to only get a quote for the given job.
@@ -261,7 +261,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * Receives and stores a translation returned by Gengo.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
+   * @param \Drupal\tmgmt\Entity\Job $job
    *   Job for which to receive translations.
    * @param string $key
    *   Data keys for data item which will be updated with translation.
@@ -300,7 +300,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    *   - Saves translation in case it has been already received.
    *   - Deals with duplicate translations.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
+   * @param \Drupal\tmgmt\Entity\Job $job
    *   Local job that is going to be processed.
    * @param array $response_jobs
    *   List of gengo jobs received.
@@ -371,7 +371,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    * The idea here is not to introduce additional storage to temporarily store
    * gegngo order id before we get gengo job ids.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
+   * @param \Drupal\tmgmt\Entity\Job $job
    *   Job for which to initiate mappings with remote jobs.
    * @param int $gorder_id
    *   Gengo job id.
@@ -397,7 +397,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * Maps TMGMT job data items to gengo jobs.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Job $job
+   * @param \Drupal\tmgmt\Entity\Job $job
    *   Job that will be mapped to remote jobs.
    */
   public function fetchGengoJobs(Job $job) {

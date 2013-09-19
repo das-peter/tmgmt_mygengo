@@ -28,8 +28,8 @@
 
 use Drupal\Component\Utility\Json;
 use Drupal\tmgmt_mygengo\GengoConnector;
-use Drupal\tmgmt\Plugin\Core\Entity\Job;
-use Drupal\tmgmt\Plugin\Core\Entity\JobItem;
+use Drupal\tmgmt\Entity\Job;
+use Drupal\tmgmt\Entity\JobItem;
 use Drupal\Core\Template\Attribute;
 
 define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
@@ -137,7 +137,7 @@ function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
   $form_state['gengo_action'] = NULL;
   $form_state['active_gengo_job_id'] = NULL;
   $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
-  /* @var JobItem $item */
+  /* @var \Drupal\tmgmt\Entity\JobItem $item */
   $item = $form_state['controller']->getEntity();
   $job = $item->getJob();
 

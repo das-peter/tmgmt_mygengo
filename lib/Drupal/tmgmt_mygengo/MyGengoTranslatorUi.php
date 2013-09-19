@@ -418,7 +418,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * Gets remaining credit info at gengo account.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Translator $translator
+   * @param \Drupal\tmgmt\Entity\Translator $translator
    *   Translator.
    *
    * @return array
@@ -446,7 +446,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * Builds quality/tier options for src/tgt language pair of the job.
    *
-   * @param Job $job
+   * @param \Drupal\tmgmt\Entity\Job $job
    *   Translation job.
    *
    * @return array
@@ -505,7 +505,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * Fetches comments from gengo service.
    *
-   * @param \Drupal\tmgmt\Plugin\Core\Entity\Translator $translator
+   * @param \Drupal\tmgmt\Entity\Translator $translator
    *   Translator plugin.
    * @param int $gengo_job_id
    *   Gengo job id for which to fetch comments.
