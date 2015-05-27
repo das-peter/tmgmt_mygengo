@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Please supply a file description.
+ * Contains Drupal\tmgmt_mygengo\MyGengoTranslatorUi.
  */
 
 namespace Drupal\tmgmt_mygengo;
@@ -13,6 +13,10 @@ use Drupal\tmgmt\Entity\Job;
 use Drupal\tmgmt\Entity\JobItem;
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\tmgmt\JobItemInterface;
+use Drupal\tmgmt\TranslatorInterface;
+use Drupal\tmgmt\JobInterface;
 
 /**
  * @file
@@ -23,7 +27,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function reviewDataItemElement($form, &$form_state, $data_item_key, $parent_key, array $data_item, JobItem $item) {
+  public function reviewDataItemElement(array $form, FormStateInterface $form_state, $data_item_key, $parent_key, array $data_item, JobItemInterface $item) {
 
     /** @var TMGMTRemote $mapping */
     $mapping = NULL;
@@ -134,7 +138,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function reviewForm($form, &$form_state, JobItem $item) {
+  public function reviewForm(array $form, FormStateInterface $form_state, JobItemInterface $item) {
 
     $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo_comments.js';
     $form['#attached']['css'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/css/tmgmt_mygengo_comments.css';
@@ -224,7 +228,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function pluginSettingsForm($form, &$form_state, Translator $translator, $busy = FALSE) {
+  public function pluginSettingsForm(array $form, FormStateInterface $form_state, TranslatorInterface $translator, $busy = FALSE) {
 
     $form['api_public_key'] = array(
       '#type' => 'textfield',
@@ -273,7 +277,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function checkoutSettingsForm($form, &$form_state, Job $job) {
+  public function checkoutSettingsForm(array $form, FormStateInterface $form_state, JobInterface $job) {
     $translator = $job->getTranslator();
 
     // Set the quality setting from submitted vals - we need this for quote as
@@ -347,7 +351,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function checkoutInfo(Job $job) {
+  public function checkoutInfo(JobInterface $job) {
     $form = array();
 
     if ($job->isActive()) {
@@ -374,7 +378,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
    * @throws \Drupal\tmgmt\TMGMTException
    *   In case of error doing request to gengo service.
    */
-  protected function getQuoteInfo(Job $job) {
+  protected function getQuoteInfo(JobInterface $job) {
     $response = NULL;
     /* @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $plugin */
     $plugin = $job->getTranslatorController();
@@ -452,7 +456,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
    * @return array
    *   Associative array of tiers with info.
    */
-  protected function getAvailableTiersOptions(Job $job) {
+  protected function getAvailableTiersOptions(JobInterface $job) {
 
     $translator = $job->getTranslator();
 

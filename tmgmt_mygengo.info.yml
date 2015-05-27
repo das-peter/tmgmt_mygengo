@@ -9,5 +9,4 @@ dependencies:
 
 test_dependencies:
  - rules
- - tmgmt_ui
  - views_bulk_operations

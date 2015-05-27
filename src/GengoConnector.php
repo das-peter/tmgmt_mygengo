@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Connector class for Gengo service.
+ * Contains \Drupal\tmgmt_mygengo\GengoConnector.
  */
 
 namespace Drupal\tmgmt_mygengo;

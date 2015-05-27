@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Provides Gengo translation plugin controller.
+ * Contains \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator.
  */
 
 namespace Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator;
@@ -18,6 +18,8 @@ use Drupal\Core\Annotation\Translation;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\tmgmt_mygengo\GengoConnector;
 use Guzzle\Http\ClientInterface;
+use Drupal\tmgmt\TranslatorInterface;
+use Drupal\tmgmt\JobInterface;
 
 /**
  * Gengo translation plugin controller.
@@ -68,7 +70,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, array $plugin_definition) {
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
     return new static(
       $container->get('http_default_client'),
       $configuration,
@@ -116,7 +118,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public function isAvailable(Translator $translator) {
+  public function isAvailable(TranslatorInterface $translator) {
     if ($translator->getSetting('api_public_key') && $translator->getSetting('api_private_key')) {
       return TRUE;
     }
@@ -128,7 +130,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    *
    * Here we will actually query source and get translations.
    */
-  public function requestTranslation(Job $job) {
+  public function requestTranslation(JobInterface $job) {
 
     try {
 
@@ -151,7 +153,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public function getSupportedRemoteLanguages(Translator $translator) {
+  public function getSupportedRemoteLanguages(TranslatorInterface $translator) {
     if (!empty($this->supportedRemoteLanguages)) {
       return $this->supportedRemoteLanguages;
     }
@@ -173,7 +175,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public function getSupportedTargetLanguages(Translator $translator, $source_language) {
+  public function getSupportedTargetLanguages(TranslatorInterface $translator, $source_language) {
     $results = array();
 
     $connector = new GengoConnector($translator, $this->client);

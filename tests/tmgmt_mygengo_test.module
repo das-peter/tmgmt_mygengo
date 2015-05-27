@@ -5,7 +5,7 @@
  * Module file of the translation management Gengo test module.
  */
 
-use Drupal\Component\Utility\Json;
+use Drupal\Component\Serialization\Json;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 /**

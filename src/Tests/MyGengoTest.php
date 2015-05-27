@@ -2,17 +2,18 @@
 
 /**
  * @file
- * Test cases for the Gengo translator module.
+ * Contains Drupal\tmgmt_mygengo\Tests\MyGengoTest.
  */
 
 namespace Drupal\tmgmt_mygengo\Tests;
 
 use Drupal;
-use Drupal\Component\Utility\Json;
+use Drupal\Component\Serialization\Json;
 use Drupal\tmgmt\Tests\TMGMTTestBase;
 
 /**
  * Basic tests for the Gengo translator.
+ * @group tmgmt
  */
 class MyGengoTest extends TMGMTTestBase {
 
@@ -22,7 +23,6 @@ class MyGengoTest extends TMGMTTestBase {
   protected $translator;
 
   public static $modules = array(
-    'tmgmt_ui',
     'tmgmt_mygengo',
     'tmgmt_mygengo_test',
   );
