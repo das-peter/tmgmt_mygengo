@@ -10,7 +10,6 @@ namespace Drupal\tmgmt_mygengo;
 use Drupal;
 use Drupal\tmgmt\TranslatorPluginUiBase;
 use Drupal\tmgmt\Entity\Job;
-use Drupal\tmgmt\Entity\JobItem;
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
 use Drupal\Core\Form\FormStateInterface;
@@ -522,7 +521,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   public function fetchComments(Translator $translator, $gengo_job_id, $reload = FALSE) {
 
     $cid = 'tmgmt_mygengo_comments_' . $gengo_job_id;
-    $cache = cache('tmgmt')->get($cid);
+    $cache =  \Drupal::cache('tmgmt')->get($cid);
 
     if (isset($cache->data) && !$reload && $cache->expire > REQUEST_TIME) {
       return $cache->data;
@@ -535,7 +534,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       $response = $connector->getComments($gengo_job_id);
 
       $data = isset($response['thread']) ? $response['thread'] : NULL;
-      cache('tmgmt')->set($cid, $data, REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
+      \Drupal::cache('tmgmt')->set($cid, $data, REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
       return $data;
     }
     catch (TMGMTException $e) {
