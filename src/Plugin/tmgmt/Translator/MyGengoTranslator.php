@@ -296,7 +296,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         $job->addMessage('Callback called for @key and status @status without translation.', array('@key' => $data['custom_data'], '@status' => $data['status']));
         return;
       }
-      $text = $this->unescapeText($data->body_tgt);
+      $text = $this->unescapeText($data['body_tgt']);
       $job->addTranslatedData(array('#text' => $text), $key);
 
       // Look for duplicated strings that were saved with a mapping to this key.

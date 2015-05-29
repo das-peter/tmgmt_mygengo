@@ -136,8 +136,7 @@ class MyGengoTest extends TMGMTTestBase {
     $jobs = $data->jobs;
     $job_keys = array_keys($jobs);
     $key = array_shift($job_keys);
-    debug($data->jobs[$key]);
-    $this->assertEqual($data->jobs[$key]['slug'], $item->getSourceLabel() . ' > ' . $item->data['wrapper']['#label']);
+    $this->assertEqual($data->jobs[$key]['slug'], $item->getSourceLabel() . ' > ' . $item->getData(['wrapper'],'#label'));
 
     // Now it should be needs review.
     foreach ($job->getItems() as $item) {
@@ -263,14 +262,14 @@ class MyGengoTest extends TMGMTTestBase {
 
     $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'wrapper][subwrapper1');
     $remote = reset($remotes);
-    $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, '');
+    $this->assertEqual($remote->remote_identifier_1->value, $order_id);
+    $this->assertEqual($remote->remote_identifier_2->value, '');
     $this->assertEqual($remote->getJobItem()->id(), $item->id());
 
     $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'no_label');
     $remote = reset($remotes);
-    $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, '');
+    $this->assertEqual($remote->remote_identifier_1->value, $order_id);
+    $this->assertEqual($remote->remote_identifier_2->value, '');
     $this->assertEqual($remote->getJobItem()->id(), $item->id());
 
     // Create a gengo response of the job.
@@ -287,11 +286,11 @@ class MyGengoTest extends TMGMTTestBase {
     Drupal::entityManager()->getStorage('tmgmt_remote')->resetCache();
     $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'wrapper][subwrapper1');
     $remote = reset($remotes);
-    $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
-    $this->assertEqual($remote->word_count, $gengo_job['unit_count']);
-    $this->assertEqual($remote->remote_data['credits'], $gengo_job['credits']);
-    $this->assertEqual($remote->remote_data['tier'], $gengo_job['tier']);
+    $this->assertEqual($remote->remote_identifier_1->value, $order_id);
+    $this->assertEqual($remote->remote_identifier_2->value, $gengo_job['job_id']);
+    $this->assertEqual($remote->word_count->value, $gengo_job['unit_count']);
+    $this->assertEqual($remote->getRemoteData('credits'), $gengo_job['credits']);
+    $this->assertEqual($remote->getRemoteData('tier'), $gengo_job['tier']);
   }
 
   public function dtestOrderModePollJob() {
@@ -358,8 +357,8 @@ class MyGengoTest extends TMGMTTestBase {
     \Drupal::entityManager()->getStorage('tmgmt_remote')->resetCache();
     $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'body');
     $remote = reset($remotes);
-    $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
+    $this->assertEqual($remote->remote_identifier_1->value, $order_id);
+    $this->assertEqual($remote->remote_identifier_2->value, $gengo_job['job_id']);
     $this->assertEqual($remote->word_count, $gengo_job['unit_count']);
     $this->assertEqual($remote->remote_data['credits'], $gengo_job['credits']);
     $this->assertEqual($remote->remote_data['tier'], $gengo_job['tier']);
@@ -372,8 +371,8 @@ class MyGengoTest extends TMGMTTestBase {
     \Drupal::entityManager()->getStorage('tmgmt_remote')->resetCache();
     $remotes = RemoteMapping::loadByLocalData($job->id(), $item2->id(), 'body');
     $remote = reset($remotes);
-    $this->assertEqual($remote->remote_identifier_1, $order_id);
-    $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
+    $this->assertEqual($remote->remote_identifier_1->value, $order_id);
+    $this->assertEqual($remote->remote_identifier_2->value, $gengo_job['job_id']);
     $this->assertEqual($remote->word_count, $gengo_job['unit_count']);
     $this->assertEqual($remote->remote_data['credits'], $gengo_job['credits']);
     $this->assertEqual($remote->remote_data['tier'], $gengo_job['tier']);
