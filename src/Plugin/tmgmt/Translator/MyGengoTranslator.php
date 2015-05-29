@@ -412,7 +412,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    */
   public function fetchGengoJobs(Job $job) {
     // Search for placeholder item.
-    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id());
+    $remotes = Drupal::entityManager()->getStorage('tmgmt_remote')->loadByLocalData($job->id());
 
     $connector = new GengoConnector($job->getTranslator(), $this->client);
 

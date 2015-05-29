@@ -12,6 +12,8 @@ use Drupal\Component\Serialization\Json;
 use Drupal\tmgmt\Tests\TMGMTTestBase;
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\Core\Url;
+use Drupal\tmgmt\Entity\RemoteMapping;
+use Drupal\tmgmt\Entity\JobItem;
 
 /**
  * Tests the Gengo translator plugin integration.
@@ -55,7 +57,6 @@ class MyGengoTest extends TMGMTTestBase {
       ),
     ));
     $item = $job->addItem('test_source', 'test', '1');
-    debug($item->getData());
     $item->save();
 
     // The translator should not be available at this point because we didn't
@@ -120,8 +121,6 @@ class MyGengoTest extends TMGMTTestBase {
     $action = Url::fromRoute('tmgmt_mygengo.callback')->setOptions(array('absolute' => TRUE))->toString();
     $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
 
-    debug($out);
-
     // Response should be empty if everything went ok.
     $this->assertResponse(200);
     $this->assertTrue(empty($out));
@@ -158,7 +157,6 @@ class MyGengoTest extends TMGMTTestBase {
     $job->settings = $machine;
     $job->translator = $this->translator->id();
     $job->save();
-    $item = $job->addItem('test_source', 'test', '1');
     \Drupal::state()->set('tmgmt.test_source_data', array(
       'wrapper' => array(
         '#label' => 'Parent label',
@@ -175,7 +173,10 @@ class MyGengoTest extends TMGMTTestBase {
         '#text' => 'No label',
       ),
     ));
+    $item = $job->addItem('test_source', 'test', '1');
     $item->save();
+
+    debug($item->getData());
 
     // Machine translation should immediately go to needs review.
     $job->requestTranslation();
@@ -187,7 +188,7 @@ class MyGengoTest extends TMGMTTestBase {
     $data = $item->getData();
     // If received a job item with tier machine the mock service will prepend
     // mt_de_ to the source text.
-    debug($data['wrapper']);
+    debug($data);
     $this->assertEqual('mt_de_Hello world', $data['wrapper']['subwrapper1']['#translation']['#text']);
     $this->assertEqual('mt_de_Hello world again', $data['wrapper']['subwrapper2']['#translation']['#text']);
 
@@ -199,6 +200,7 @@ class MyGengoTest extends TMGMTTestBase {
     $subwrapper1_key = $job->id() . '][' . $item->id() . '][wrapper][subwrapper1';
     $no_label_key = $job->id() . '][' . $item->id() . '][no_label';
     $this->assertEqual($jobs[$subwrapper1_key]['slug'], 'Parent label > Sub label 1');
+    debug($jobs[$no_label_key]);
     $this->assertEqual($jobs[$no_label_key]['slug'], 'No label');
 
     // Test positions.
@@ -208,7 +210,7 @@ class MyGengoTest extends TMGMTTestBase {
     }
   }
 
-  public function dtestOrderModeCallback() {
+  public function testOrderModeCallback() {
     \Drupal::state()->set('tmgmt_mygengo_test_order_mode', 1);
 
     $this->translator->setSetting('api_public_key', 'correct key');
@@ -223,8 +225,7 @@ class MyGengoTest extends TMGMTTestBase {
     $job->settings = $standard;
     $job->translator = $this->translator->id();
     $job->save();
-    $item = $job->addItem('test_source', 'test', '1');
-    $item->data = array(
+    \Drupal::state()->set('tmgmt.test_source_data', array(
       'wrapper' => array(
         '#label' => 'Parent label',
         'subwrapper1' => array(
@@ -239,7 +240,8 @@ class MyGengoTest extends TMGMTTestBase {
       'no_label' => array(
         '#text' => 'No label',
       ),
-    );
+    ));
+    $item = $job->addItem('test_source', 'test', '1');
     $item->save();
 
     $job->requestTranslation();
@@ -247,17 +249,17 @@ class MyGengoTest extends TMGMTTestBase {
     $this->refreshVariables();
     $orders = \Drupal::state()->get('tmgmt_mygengo_test_orders', array());
     $order_id = key($orders);
-    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id());
+    $remotes = RemoteMapping::loadByLocalData($job->id());
     // Remotes should have been created with the order id and without job id.
     $this->assertEqual(count($remotes), 3, '3 remote mappings created.');
 
-    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item->id(), 'wrapper][subwrapper1');
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'wrapper][subwrapper1');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, '');
     $this->assertEqual($remote->getJobItem()->id(), $item->id());
 
-    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item->id(), 'no_label');
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'no_label');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, '');
@@ -274,8 +276,8 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertResponse(200);
     $this->assertTrue(empty($out));
 
-    Drupal::entityManager()->getStorageController('tmgmt_remote')->resetCache();
-    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item->id(), 'wrapper][subwrapper1');
+    Drupal::entityManager()->getStorage('tmgmt_remote')->resetCache();
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'wrapper][subwrapper1');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
@@ -340,13 +342,13 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertText(t('All available translations from Gengo have been polled.'));
 
     // Check the updated mappings of item 1.
-    $remotes = \Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item->id());
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id());
     $this->assertEqual(count($remotes), 2, '2 remotes for item 1');
 
     $gengo_job = $orders[$order_id][$job->id() . '][' . $item->id() . '][body'];
 
-    \Drupal::entityManager()->getStorageController('tmgmt_remote')->resetCache();
-    $remotes = \Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item->id(), 'body');
+    \Drupal::entityManager()->getStorage('tmgmt_remote')->resetCache();
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'body');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
@@ -355,12 +357,12 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual($remote->remote_data['tier'], $gengo_job['tier']);
 
     // And item 2.
-    $remotes = \Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item2->id());
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item2->id());
     $this->assertEqual(count($remotes), 3, '3 remotes for item 2');
     $gengo_job = $orders[$order_id][$job->id() . '][' . $item2->id() . '][body'];
 
-    \Drupal::entityManager()->getStorageController('tmgmt_remote')->resetCache();
-    $remotes = \Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item2->id(), 'body');
+    \Drupal::entityManager()->getStorage('tmgmt_remote')->resetCache();
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item2->id(), 'body');
     $remote = reset($remotes);
     $this->assertEqual($remote->remote_identifier_1, $order_id);
     $this->assertEqual($remote->remote_identifier_2, $gengo_job['job_id']);
@@ -401,7 +403,7 @@ class MyGengoTest extends TMGMTTestBase {
     $job->requestTranslation();
 
     // Make sure machine translation was received.
-    \Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
+    \Drupal::entityManager()->getStorage('tmgmt_job_item')->resetCache();
     $items = $job->getItems();
     $item = end($items);
     $data = $item->getData();
@@ -429,7 +431,7 @@ class MyGengoTest extends TMGMTTestBase {
     $job->requestTranslation();
 
     // See if available translation from gengo has updated our translation.
-    \Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
+    \Drupal::entityManager()->getStorage('tmgmt_job_item')->resetCache();
     $items = $job->getItems();
     $item = end($items);
     $data = $item->getData();
@@ -492,7 +494,7 @@ class MyGengoTest extends TMGMTTestBase {
     $job->requestTranslation();
 
     // Make sure the duplicated and not duplicated texts are translated.
-    \Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
+    \Drupal::entityManager()->getStorage('tmgmt_job_item')->resetCache();
     list($item1, $item2) = array_values($job->getItems());
 
     // Item 1.
@@ -551,7 +553,7 @@ class MyGengoTest extends TMGMTTestBase {
     $job->requestTranslation();
 
     // Get mapping for first data item of second job item -> Title "Nice day".
-    $remotes = \Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->id(), $item->id(), 'title');
+    $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id(), 'title');
     $remote = reset($remotes);
 
     $this->drupalPostAJAX('admin/tmgmt/items/' . $item->id(), array(), array($remote->remote_identifier_2 . '_comment_form' => '✉'));
@@ -629,8 +631,8 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertText(t('All available translations from Gengo have been polled.'));
 
     // Reload item data.
-    \Drupal::entityManager()->getStorageController('tmgmt_job_item')->resetCache();
-    $item = tmgmt_job_item_load($item->id());
+    \Drupal::entityManager()->getStorage('tmgmt_job_item')->resetCache();
+    $item = JobItem::load($item->id());
     $item_data = $item->getData();
 
     // Title should be translated by now.

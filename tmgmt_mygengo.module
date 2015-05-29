@@ -118,7 +118,7 @@ function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
     $connector->postComment($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
     $form_state['submitted_gengo_action'] = 'comment';
   }
-  catch (TMGMTException $e) {
+  catch (\Exception $e) {
     watchdog_exception('tmgmt_mygengo', $e);
     drupal_set_message(t('Unable to add comment. Error: !error', array('!error' => $e->getMessage())), 'error');
   }
@@ -149,7 +149,7 @@ function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
     $item->updateData($data_item_key, array('#status' => TMGMT_DATA_ITEM_STATE_PENDING));
 
     $items = array();
-    $items[$item->tjiid] = $item;
+    $items[$item->id()] = $item;
 
     // Check remote mapping for duplicates, update them as well.
     $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($item->tjid, $item->tjiid, $data_item_key);
@@ -158,7 +158,7 @@ function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
       foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
         list($tjiid, $data_item_key) = explode('][', $duplicate_key, 2);
         if (!isset($items[$tjiid])) {
-          $items[$tjiid] = tmgmt_job_item_load($tjiid);
+          $items[$tjiid] = JobItem::load($tjiid);
         }
         if ($items[$tjiid]) {
           $items[$tjiid]->updateData($data_item_key, array('#status' => TMGMT_DATA_ITEM_STATE_PENDING));
@@ -173,7 +173,7 @@ function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
 
     $form_state['submitted_gengo_action'] = 'revision';
   }
-  catch (TMGMTException $e) {
+  catch (\Exception $e) {
     watchdog_exception('tmgmt_mygengo', $e);
     drupal_set_message(t('Unable to add revision. Error: !error', array('!error' => $e->getMessage())), 'error');
   }
