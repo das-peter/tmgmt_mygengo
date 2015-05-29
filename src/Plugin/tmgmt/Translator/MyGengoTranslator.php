@@ -37,6 +37,16 @@ use Drupal\tmgmt\Entity\RemoteMapping;
 class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactoryPluginInterface {
 
   /**
+   * {@inheritdoc}
+   */
+  protected $escapeStart = '[[[';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected $escapeEnd = ']]]';
+
+  /**
    * If set it will be sent by job post action as a comment.
    *
    * @var string
@@ -233,7 +243,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
 
       $translations[$job->id() . '][' . $key] = array(
         'type' => 'text',
-        'slug' =>  \Drupal::service('tmgmt.data')->itemLabel($value),
+        'slug' =>  \Drupal::service('tmgmt.data')->itemLabel($value, 56),
         'body_src' => $value['#text'],
         'lc_src' => $translator->mapToRemoteLanguage($job->getSourceLangcode()),
         'lc_tgt' => $translator->mapToRemoteLanguage($job->getTargetLangcode()),
@@ -286,7 +296,8 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         $job->addMessage('Callback called for @key and status @status without translation.', array('@key' => $data['custom_data'], '@status' => $data['status']));
         return;
       }
-      $job->addTranslatedData(array('#text' => $data['body_tgt']), $key);
+      $text = $this->unescapeText($data->body_tgt);
+      $job->addTranslatedData(array('#text' => $text), $key);
 
       // Look for duplicated strings that were saved with a mapping to this key.
       // @todo: Refactor this method to accept the remote instead of $key?
@@ -296,7 +307,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       if ($remote && !empty($remote->remote_data['duplicates'])) {
         // If we found any mappings, also add the translation for those.
         foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
-          $job->addTranslatedData(array('#text' => $data['body_tgt']), $duplicate_key);
+          $job->addTranslatedData(array('#text' => $text), $duplicate_key);
         }
       }
     }

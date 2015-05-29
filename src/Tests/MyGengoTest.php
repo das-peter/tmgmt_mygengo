@@ -137,7 +137,7 @@ class MyGengoTest extends TMGMTTestBase {
     $job_keys = array_keys($jobs);
     $key = array_shift($job_keys);
     debug($data->jobs[$key]);
-    $this->assertEqual($data->jobs[$key]['slug'], $item->getData()['wrapper']['#label']);
+    $this->assertEqual($data->jobs[$key]['slug'], $item->getSourceLabel() . ' > ' . $item->data['wrapper']['#label']);
 
     // Now it should be needs review.
     foreach ($job->getItems() as $item) {
@@ -172,6 +172,12 @@ class MyGengoTest extends TMGMTTestBase {
       'no_label' => array(
         '#text' => 'No label',
       ),
+      'escaping' => array(
+        '#text' => 'A text with a @placeholder',
+        '#escape' => array(
+          14 => array('string' => '@placeholder'),
+        )
+      ),
     ));
     $item = $job->addItem('test_source', 'test', '1');
     $item->save();
@@ -191,6 +197,7 @@ class MyGengoTest extends TMGMTTestBase {
     debug($data);
     $this->assertEqual('mt_de_Hello world', $data['wrapper']['subwrapper1']['#translation']['#text']);
     $this->assertEqual('mt_de_Hello world again', $data['wrapper']['subwrapper2']['#translation']['#text']);
+    $this->assertEqual('mt_de_A text with a @placeholder', $data['escaping']['#translation']['#text']);
 
     // Verify generated labels/slugs.
     $this->refreshVariables();
@@ -199,9 +206,10 @@ class MyGengoTest extends TMGMTTestBase {
 
     $subwrapper1_key = $job->id() . '][' . $item->id() . '][wrapper][subwrapper1';
     $no_label_key = $job->id() . '][' . $item->id() . '][no_label';
-    $this->assertEqual($jobs[$subwrapper1_key]['slug'], 'Parent label > Sub label 1');
-    debug($jobs[$no_label_key]);
-    $this->assertEqual($jobs[$no_label_key]['slug'], 'No label');
+    $escaping_key = $job->id() . '][' . $item->id() . '][escaping';
+    $this->assertEqual($jobs[$subwrapper1_key]['slug'],  $item->getSourceLabel() . ' > Parent label > Sub label 1');
+    $this->assertEqual($jobs[$no_label_key]['slug'], $item->getSourceLabel());
+    $this->assertEqual($jobs[$escaping_key]['body_src'], 'A text with a [[[@placeholder]]]');
 
     // Test positions.
     $position = 0;
