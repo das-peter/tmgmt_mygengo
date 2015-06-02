@@ -19,10 +19,10 @@ class GengoTranslatorTestController {
   /**
    * Mock service - Job PUT - used for job review.
    *
-   * @param int $gengo_job_id
+   * @param int $job_id
    *   Gengo job id.
    */
-  function serviceJob($gengo_job_id) {
+  function serviceJob($job_id) {
     $data = array();
     parse_str(file_get_contents('php://input'), $data);
 
@@ -36,7 +36,7 @@ class GengoTranslatorTestController {
       $comment->author = 'yogi bear';
 
       $comments = \Drupal::state()->get('tmgmt_mygengo_test_comments', array());
-      $comments[$gengo_job_id][] = $comment;
+      $comments[$job_id][] = $comment;
       \Drupal::state()->set('tmgmt_mygengo_test_comments', $comments);
     }
 
@@ -77,7 +77,6 @@ class GengoTranslatorTestController {
         'opstat' => 'ok',
         'response' => array('order' => $order),
       ));
-      return;
     }
     return new JsonResponse(array(
       'opstat' => 'error',
@@ -88,10 +87,10 @@ class GengoTranslatorTestController {
   /**
    * Mock service call to create a comment.
    *
-   * @param int $gengo_job_id
+   * @param int $job_id
    *   Remote job id.
    */
-  function serviceCommentCreate($gengo_job_id) {
+  function serviceCommentCreate($job_id) {
     $comment = new \stdClass();
     $data = Json::decode($_POST['data']);
     $comment->body = $data['body'];
@@ -99,7 +98,7 @@ class GengoTranslatorTestController {
     $comment->author = 'yogi bear';
 
     $comments = \Drupal::state()->get('tmgmt_mygengo_test_comments', array());
-    $comments[$gengo_job_id][] = $comment;
+    $comments[$job_id][] = $comment;
     \Drupal::state()->set('tmgmt_mygengo_test_comments', $comments);
 
     return new JsonResponse(array(
@@ -111,17 +110,17 @@ class GengoTranslatorTestController {
   /**
    * Mock service call to fetch remote comments.
    *
-   * @param int $gengo_job_id
+   * @param int $job_id
    *   Remote job id.
    */
-  function serviceCommentsGet($gengo_job_id) {
+  function serviceCommentsGet($job_id) {
     $response = new \stdClass();
     $comments = \Drupal::state()->get('tmgmt_mygengo_test_comments', array());
-    if (!isset($comments[$gengo_job_id])) {
-      $comments[$gengo_job_id] = array();
+    if (!isset($comments[$job_id])) {
+      $comments[$job_id] = array();
     }
 
-    $response->thread = $comments[$gengo_job_id];
+    $response->thread = $comments[$job_id];
 
     return new JsonResponse(array(
       'opstat' => 'ok',

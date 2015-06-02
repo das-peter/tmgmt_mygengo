@@ -197,7 +197,6 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
     }
     catch (\Exception $e) {
       watchdog_exception('tmgmt', $e);
-      debug($e->getMessage());
       drupal_set_message($e->getMessage(), 'error');
     }
 
@@ -380,6 +379,19 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
           'duplicates' => isset($duplicates[$item_id_data_key]) ? $duplicates[$item_id_data_key] : array(),
         ),
       ));
+
+     /* debug(array(
+        // Yes, this is not a joke, they really return string value "NULL" in
+        // case of a machine translation.
+        'remote_identifier_2' => $response_job['job_id'] == 'NULL' ? 0 : $response_job['job_id'],
+        'word_count' => $response_job['unit_count'],
+        'remote_data' => array(
+          'credits' => $response_job['credits'],
+          'tier' => $response_job['tier'],
+          'duplicates' => isset($duplicates[$item_id_data_key]) ? $duplicates[$item_id_data_key] : array(),
+        ),
+      ));*/
+
       // Update the translation. This needs to be after the mapping as it
       // depends on it for the duplicates handling.
       $this->saveTranslation($job, $item_id_data_key, $response_job);
@@ -423,7 +435,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    */
   public function fetchGengoJobs(Job $job) {
     // Search for placeholder item.
-    $remotes = Drupal::entityManager()->getStorage('tmgmt_remote')->loadByLocalData($job->id());
+    $remotes = RemoteMapping::loadByLocalData($job->id());
 
     $connector = new GengoConnector($job->getTranslator(), $this->client);
 
@@ -432,11 +444,11 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
     $job_ids = array();
     $new_job_ids = array();
     foreach ($remotes as $remote) {
-      if (!empty($remote->remote_identifier_1) && !isset($order_ids[$remote->remote_identifier_1])) {
-        $order_ids[$remote->remote_identifier_1] = $remote->remote_identifier_1;
+      if (!empty($remote->remote_identifier_1->value) && !isset($order_ids[$remote->remote_identifier_1->value])) {
+        $order_ids[$remote->remote_identifier_1->value] = $remote->remote_identifier_1->value;
       }
-      if (!empty($remote->remote_identifier_2)) {
-        $job_ids[$remote->remote_identifier_2] = $remote->remote_identifier_2;
+      if (!empty($remote->remote_identifier_2->value)) {
+        $job_ids[$remote->remote_identifier_2->value] = $remote->remote_identifier_2->value;
       }
     }
 
@@ -503,7 +515,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
 
         $matching_remote = NULL;
         foreach ($remotes as $remote) {
-          if ($remote->data_item_key == $data_item_key && $remote->tjiid == $tjiid) {
+          if ($remote->data_item_key->value == $data_item_key && $remote->tjiid == $tjiid) {
             $matching_remote = $remote;
             break;
           }
@@ -511,7 +523,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
 
         // We don't have a remote mapping yet, create one.
         if (!$matching_remote) {
-          $item = tmgmt_job_item_load($tjiid);
+          $item = JobItem::load($tjiid);
           $item->addRemoteMapping($data_item_key, $new_job_ids[$response_job['job_id']], array(
             'remote_identifier_2' => $response_job['job_id'],
             'word_count' => $response_job['unit_count'],
@@ -526,10 +538,8 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         else {
           $matching_remote->remote_identifier_2 = $response_job['job_id'];
           $matching_remote->word_count = $response_job['unit_count'];
-          $matching_remote->remote_data = array(
-            'credits' => $response_job['credits'],
-            'tier' => $response_job['tier'],
-          );
+          $matching_remote->addRemoteData('credits', $response_job['credits']);
+          $matching_remote->addRemoteData('tier', $response_job['tier']);
           $matching_remote->save();
         }
       }

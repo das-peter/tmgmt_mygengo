@@ -27,7 +27,7 @@ class MyGengoController extends ControllerBase {
     // First, check if this is a comment notification.
     if (isset($_POST['comment'])) {
       $comment = Json::decode($_POST['comment']);
-      \Drupal::cache('tmgmt')->delete('tmgmt_mygengo_comments_' . $comment['job_id']);
+      \Drupal::cache('data')->delete('tmgmt_mygengo_comments_' . $comment['job_id']);
       return new Response();
     }
 

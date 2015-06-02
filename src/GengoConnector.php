@@ -321,7 +321,6 @@ class GengoConnector {
         ), $data);
 
         $url = Url::fromUri($url)->setOptions(array('query' => $query, 'absolute' => TRUE))->toString();
-        debug($url, $method);
         $request = $this->client->createRequest($method, $url, ['headers' => $headers]);
       }
       else {
@@ -333,7 +332,6 @@ class GengoConnector {
         );
 
         $url = Url::fromUri($url)->setOptions(array('absolute' => TRUE))->toString();
-        debug($url, $method);
         $request = $this->client->createRequest($method, $url, ['headers' => $headers, 'body' => $data]);
       }
 
@@ -353,7 +351,7 @@ class GengoConnector {
     }
     catch (BadResponseException $e) {
         $error = $e->getResponse()->json();
-        throw new \Exception('Unable to connect to Gengo service due to following error: ' . $error['err']['msg']);
+        throw new \Exception('Unable to connect to Gengo service due to following error: ' . $error['message']);
     }
 
     $results = $response->json();
