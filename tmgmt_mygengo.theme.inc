@@ -39,7 +39,7 @@ function theme_tmgmt_mygengo_comments_thread($variables) {
       '</div><div ' . $attributes . '>' . SafeMarkup::checkPlain($comment['body']) . '</div>');
   }
 
-  $list = ['#theme' => 'item_list', 'items' => $comments];
+  $list = ['#theme' => 'item_list', '#items' => $comments];
 
   return \Drupal::service('renderer')->render($list) . '<div class="comments-list-closing" id="' . $gengo_job_id . '-comments-list-closing"></div>';
 }
