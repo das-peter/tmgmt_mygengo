@@ -23,7 +23,7 @@ class MyGengoController extends ControllerBase {
   /**
    * Process response from mygengo.
    */
-  function callback() {
+  public function callback() {
     // First, check if this is a comment notification.
     if (isset($_POST['comment'])) {
       $comment = Json::decode($_POST['comment']);

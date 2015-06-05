@@ -22,7 +22,7 @@ class GengoTranslatorTestController {
    * @param int $job_id
    *   Gengo job id.
    */
-  function serviceJob($job_id) {
+  public function serviceJob($job_id) {
     $data = array();
     parse_str(file_get_contents('php://input'), $data);
 
@@ -49,7 +49,7 @@ class GengoTranslatorTestController {
   /**
    * Mock service to return previously submitted jobs.
    */
-  function jobsGet() {
+  public function jobsGet() {
     return new JsonResponse(array(
       'opstat' => 'ok',
       'response' => \Drupal::state()->get('tmgmt_mygengo_test_last_gengo_response'),
@@ -59,7 +59,7 @@ class GengoTranslatorTestController {
   /**
    * Mock service to return information about an order.
    */
-  function serviceOrderGet($order_id) {
+  public function serviceOrderGet($order_id) {
     debug($order_id);
     $orders = \Drupal::state()->get('tmgmt_mygengo_test_orders', array());
     debug($orders[$order_id]);
@@ -90,7 +90,7 @@ class GengoTranslatorTestController {
    * @param int $job_id
    *   Remote job id.
    */
-  function serviceCommentCreate($job_id) {
+  public function serviceCommentCreate($job_id) {
     $comment = new \stdClass();
     $data = Json::decode($_POST['data']);
     $comment->body = $data['body'];
@@ -113,7 +113,7 @@ class GengoTranslatorTestController {
    * @param int $job_id
    *   Remote job id.
    */
-  function serviceCommentsGet($job_id) {
+  public function serviceCommentsGet($job_id) {
     $response = new \stdClass();
     $comments = \Drupal::state()->get('tmgmt_mygengo_test_comments', array());
     if (!isset($comments[$job_id])) {
@@ -205,7 +205,7 @@ class GengoTranslatorTestController {
   /**
    * Page callback account balance.
    */
-  function serviceAccountBalance() {
+  public function serviceAccountBalance() {
     $balance = new \stdClass();
     $balance->credits = 25.32;
     $balance->currency = 'USD';
@@ -218,7 +218,7 @@ class GengoTranslatorTestController {
   /**
    * Page callback for getting the supported languages.
    */
-  function serviceGetLanguages() {
+  public function serviceGetLanguages() {
 
     $languages = array(
       'de' => array(
@@ -244,7 +244,7 @@ class GengoTranslatorTestController {
   /**
    * Page callback for getting language pairs.
    */
-  function serviceGetLanguagePairs() {
+  public function serviceGetLanguagePairs() {
 
     $pairs = array();
 
@@ -276,7 +276,7 @@ class GengoTranslatorTestController {
    * Note that this mock service returns just static info. There is no logic
    * that would somehow react on what has been submitted as job data.
    */
-  function serviceGetQuote() {
+  public function serviceGetQuote() {
 
     $quote = new \stdClass();
     $quote->jobs = array();
