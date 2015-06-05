@@ -16,7 +16,7 @@ use GuzzleHttp\Message;
 
 /**
  * Class GengoConnector
- * @package Drupal\tmgmt_mygengo
+ * Implements methods for connecting and getting data from mygengo.
  */
 class GengoConnector {
 

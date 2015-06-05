@@ -380,18 +380,6 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         ),
       ));
 
-     /* debug(array(
-        // Yes, this is not a joke, they really return string value "NULL" in
-        // case of a machine translation.
-        'remote_identifier_2' => $response_job['job_id'] == 'NULL' ? 0 : $response_job['job_id'],
-        'word_count' => $response_job['unit_count'],
-        'remote_data' => array(
-          'credits' => $response_job['credits'],
-          'tier' => $response_job['tier'],
-          'duplicates' => isset($duplicates[$item_id_data_key]) ? $duplicates[$item_id_data_key] : array(),
-        ),
-      ));*/
-
       // Update the translation. This needs to be after the mapping as it
       // depends on it for the duplicates handling.
       $this->saveTranslation($job, $item_id_data_key, $response_job);
