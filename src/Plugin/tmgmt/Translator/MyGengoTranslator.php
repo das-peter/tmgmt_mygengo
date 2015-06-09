@@ -247,7 +247,6 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         'lc_src' => $translator->mapToRemoteLanguage($job->getSourceLangcode()),
         'lc_tgt' => $translator->mapToRemoteLanguage($job->getTargetLangcode()),
         'tier' => $job->getSetting('quality'),
-
         'callback_url' => Url::fromRoute('tmgmt_mygengo.callback')->setOptions(array('absolute' => TRUE))->toString(),
         'custom_data' => $job->id() . '][' . $key,
         'position' => $position++,
@@ -390,7 +389,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    * Creates placeholder records in the mapping table.
    *
    * The idea here is not to introduce additional storage to temporarily store
-   * gegngo order id before we get gengo job ids.
+   * gengo order id before we get gengo job ids.
    *
    * @param \Drupal\tmgmt\Entity\Job $job
    *   Job for which to initiate mappings with remote jobs.
@@ -524,7 +523,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         }
         // We have a mapping, update it.
         else {
-          $matching_remote->remote_identifier_2 = $response_job['job_id'];
+          $matching_remote->remote_identifier_2->value = $response_job['job_id'];
           $matching_remote->word_count = $response_job['unit_count'];
           $matching_remote->addRemoteData('credits', $response_job['credits']);
           $matching_remote->addRemoteData('tier', $response_job['tier']);

@@ -16,7 +16,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\tmgmt\JobItemInterface;
 use Drupal\tmgmt\TranslatorInterface;
 use Drupal\tmgmt\JobInterface;
-use Drupal\tmgmt\Entity\RemoteMapping;
+use Drupal\tmgmt\RemoteMappingInterface;
 
 /**
  * @file
@@ -29,7 +29,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
    */
   public function reviewDataItemElement(array $form, FormStateInterface $form_state, $data_item_key, $parent_key, array $data_item, JobItemInterface $item) {
 
-    /** @var RemoteMapping $mapping */
+    /** @var \Drupal\tmgmt\RemoteMappingInterface $mapping */
     $mapping = NULL;
     foreach ($item->getRemoteMappings() as $value) {
       if ($value->data_item_key->value == $data_item_key) {

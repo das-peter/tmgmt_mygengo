@@ -11,6 +11,7 @@ use Drupal\Component\Serialization\Json;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\tmgmt\Entity\Job;
 use Drupal\tmgmt\Entity\JobItem;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Drupal\tmgmt\Entity\RemoteMapping;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -23,20 +24,20 @@ class MyGengoController extends ControllerBase {
   /**
    * Process response from mygengo.
    */
-  public function callback() {
+  public function callback(Request $request) {
     // First, check if this is a comment notification.
-    if (isset($_POST['comment'])) {
-      $comment = Json::decode($_POST['comment']);
+    if ($request->request->get('comment')) {
+      $comment = Json::decode($request->request->get('comment'));
       \Drupal::cache('data')->delete('tmgmt_mygengo_comments_' . $comment['job_id']);
       return new Response();
     }
 
     // Check if we have a job.
-    if (!isset($_POST['job'])) {
+    if (!($request->request->get('job'))) {
       throw new NotFoundHttpException;
     }
 
-    $data = Json::decode($_POST['job']);
+    $data = Json::decode($request->request->get('job'));
     list($tjid, $tjiid, $data_item_key) = explode('][', $data['custom_data'], 3);
     $job = Job::load($tjid);
     if (!$job) {
@@ -60,8 +61,8 @@ class MyGengoController extends ControllerBase {
         // @todo: Add remote_url.
       ));
     }
-    elseif (empty($remote->remote_identifier_2)) {
-      $remote->remote_identifier_2 = $data['job_id'];
+    elseif (empty($remote->remote_identifier_2->value)) {
+      $remote->remote_identifier_2->value = $data['job_id'];
       $remote->word_count = $data['unit_count'];
       $remote->remote_data['credits'] = $data['credits'];
       $remote->remote_data['tier'] = $data['tier'];

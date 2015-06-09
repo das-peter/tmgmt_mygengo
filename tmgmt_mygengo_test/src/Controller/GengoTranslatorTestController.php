@@ -90,9 +90,9 @@ class GengoTranslatorTestController {
    * @param int $job_id
    *   Remote job id.
    */
-  public function serviceCommentCreate($job_id) {
+  public function serviceCommentCreate($job_id, Request $request) {
     $comment = new \stdClass();
-    $data = Json::decode($_POST['data']);
+    $data = Json::decode($request->request->get('data'));
     $comment->body = $data['body'];
     $comment->ctime = REQUEST_TIME;
     $comment->author = 'yogi bear';
@@ -132,9 +132,11 @@ class GengoTranslatorTestController {
   /**
    * Gengo mock service.
    */
-  public function serviceTranslate() {
+  public function serviceTranslate(Request $request) {
 
-    if ($error_response = tmgmt_mygengo_test_authenticate()) {
+    //file_put_contents('debugging', print_r($request->request->get('data')));
+
+    if ($error_response = tmgmt_mygengo_test_authenticate($request)) {
       return $error_response;
     }
 
@@ -143,8 +145,8 @@ class GengoTranslatorTestController {
     $sources = array();
 
     // Use case when jobs have been submitted to gengo.
-    if (!empty($_POST['data'])) {
-      $data = Json::decode($_POST['data']);
+    if ($request->request->get('data')) {
+      $data = Json::decode($request->request->get('data'));
 
       foreach ($data['jobs'] as $id => $job) {
 
@@ -184,7 +186,6 @@ class GengoTranslatorTestController {
           $order_id = count($orders) + 1;
         }
         $orders[$order_id] = $response->jobs;
-        debug($orders);
         \Drupal::state()->set('tmgmt_mygengo_test_orders', $orders);
         unset($response->jobs);
         $response->order_id = $order_id;

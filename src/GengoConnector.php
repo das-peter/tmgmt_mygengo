@@ -336,23 +336,26 @@ class GengoConnector {
       }
 
       if (\Drupal::config('tmgmt_mygengo.settings')->get('use_mock_service') && isset($_COOKIE['XDEBUG_SESSION'])) {
-        $request->addHeader('Cookie', 'XDEBUG_SESSION=' . $_COOKIE['XDEBUG_SESSION']);
+        // @todo Passing on the debug cookie results in exceptions.
+        //$request->addHeader('Cookie', 'XDEBUG_SESSION=' . $_COOKIE['XDEBUG_SESSION']);
       }
       $response = $this->client->send($request);
 
       if ($this->debug == TRUE) {
-        watchdog('tmgmt_mygengo', "Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
+        \Drupal::logger('tmgmt_mygengo')->info("Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
           '@url' => $url,
           '@method' => $method,
-          '@data' => var_export($response->getRequest(), TRUE),
+          '@data' => var_export($request, TRUE),
           '@response' => var_export($response, TRUE),
-        ), WATCHDOG_DEBUG);
+        ));
       }
     }
     catch (BadResponseException $e) {
         $error = $e->getResponse()->json();
         throw new \Exception('Unable to connect to Gengo service due to following error: ' . $error['message']);
     }
+
+    // debug($response->getBody()->getContents());
 
     $results = $response->json();
 
