@@ -43,7 +43,7 @@ class MyGengoTest extends TMGMTTestBase {
   /**
    * Tests basic API methods of the plugin.
    */
-  public function dtestAPI() {
+  public function testAPI() {
 
     $job = $this->createJob();
     $standard = array(
@@ -307,7 +307,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual($remote->getRemoteData('tier'), $gengo_job['tier']);
   }
 
-  public function dtestOrderModePollJob() {
+  public function testOrderModePollJob() {
     \Drupal::state()->set('tmgmt_mygengo_test_order_mode', 1);
     $this->loginAsAdmin();
     $this->translator->setSetting('api_public_key', 'correct key');
@@ -392,7 +392,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual($remote->getRemoteData('tier'), $gengo_job['tier']);
   }
 
-  public function dtestAvailableStatus() {
+  public function testAvailableStatus() {
     $this->loginAsAdmin();
 
     // Make sure we have correct keys.
@@ -462,7 +462,7 @@ class MyGengoTest extends TMGMTTestBase {
   /**
    * Tests that duplicated strings can be translated correctly.
    */
-  public function dtestDuplicateStrings() {
+  public function testDuplicateStrings() {
     $this->loginAsAdmin();
 
     // Make sure we have correct keys.
@@ -531,7 +531,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual('mt_de_Not duplicate but same key', $data['wrapper']['duplicate1']['#translation']['#text']);
   }
 
-  public function dtestComments() {
+  public function testComments() {
     $this->loginAsAdmin();
 
     // Create job with two job items.
@@ -619,7 +619,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertText($comment);
   }
 
-  public function dtestPollJob() {
+  public function testPollJob() {
     $this->loginAsAdmin();
     $this->translator->setSetting('api_public_key', 'correct key');
     $this->translator->setSetting('api_private_key', 'correct key');
@@ -672,7 +672,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual($item_data['body']['#status'], TMGMT_DATA_ITEM_STATE_PENDING);
   }
 
-  public function dtestGengoCheckoutForm() {
+  public function testGengoCheckoutForm() {
     $this->loginAsAdmin();
     $this->translator->setSetting('api_public_key', 'correct key');
     $this->translator->setSetting('api_private_key', 'correct key');
