@@ -4,6 +4,7 @@ tmgmt_mygengo_test.job:
     _controller: '\Drupal\tmgmt_mygengo_test\Controller\GengoTranslatorTestController::serviceJob'
   requirements:
     _access: 'TRUE'
+  methods: [GET, POST, PUT]
 tmgmt_mygengo_test.jobs_get:
   path: '/tmgmt_mygengo_mock/v2/translate/jobs/{job_id}'
   defaults:

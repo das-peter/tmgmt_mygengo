@@ -21,7 +21,6 @@ use Drupal\Core\Render\Element;
 function theme_tmgmt_mygengo_comments_thread($variables) {
   $thread = $variables['thread'];
   $gengo_job_id = $variables['gengo_job_id'];
-  debug($gengo_job_id);
   if (empty($thread) || !is_array($thread)) {
     return '';
   }

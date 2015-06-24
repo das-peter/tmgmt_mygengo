@@ -302,9 +302,9 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       list($tjiid, $data_item_key) = explode('][', $key, 2);
       $remotes = RemoteMapping::loadByLocalData($job->id(), $tjiid, $data_item_key);
       $remote = reset($remotes);
-      if ($remote && !empty($remote->remote_data['duplicates'])) {
+      if ($remote && !empty($remote->remote_data->duplicates)) {
         // If we found any mappings, also add the translation for those.
-        foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
+        foreach ($remote->remote_data->duplicates as $duplicate_key) {
           $job->addTranslatedData(array('#text' => $text), $duplicate_key);
         }
       }
@@ -348,7 +348,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // @todo - this is just a quick fix so that we can finish job submission
       // in such case. But not a solution as we end up with not mapped jobs
       // at gengo. This should be fixed in #2022147.
-      if ($response_job['status'] == 'held') {
+      if ($response_job[0]['status'] == 'held') {
         continue;
       }
 

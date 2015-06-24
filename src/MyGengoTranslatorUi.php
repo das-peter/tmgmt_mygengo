@@ -411,18 +411,18 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       'sum_word_count' => 0,
     );
 
-    if (!empty($response->jobs)) {
-      $jobs = (array) $response->jobs;
+    if (!empty($response['jobs'])) {
+      $jobs = (array) $response['jobs'];
 
-      $quote['currency'] = reset($jobs)->currency;
+      $quote['currency'] = reset($jobs)['currency'];
 
       // Sum up quotes from each job.
-      foreach ($response->jobs as $job) {
-        $quote['sum_word_count'] += $job->unit_count;
-        $quote['sum_credits'] += $job->credits;
+      foreach ($response['jobs'] as $job) {
+        $quote['sum_word_count'] += $job['unit_count'];
+        $quote['sum_credits'] += $job['credits'];
 
-        if ($job->eta > $quote['highest_eta']) {
-          $quote['highest_eta'] = $job->eta;
+        if ($job['eta'] > $quote['highest_eta']) {
+          $quote['highest_eta'] = $job['eta'];
         }
       }
     }
