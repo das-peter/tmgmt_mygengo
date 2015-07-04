@@ -26,11 +26,10 @@
  *   completely or add some meaning full access control.
  */
 
-use Drupal\Component\Utility\Json;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\tmgmt\Entity\RemoteMapping;
 use Drupal\tmgmt_mygengo\GengoConnector;
-use Drupal\tmgmt\Entity\Job;
 use Drupal\tmgmt\Entity\JobItem;
-use Drupal\Core\Template\Attribute;
 
 define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
 
@@ -39,9 +38,9 @@ define('TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE', 900);
  *
  * @see MyGengoTranslatorUi::reviewForm()
  */
-function tmgmt_mygengo_review_comments_pane_form_ajax($form, &$form_state) {
-  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
-  $target_key = $form_state['triggering_element']['#target_key'];
+function tmgmt_mygengo_review_comments_pane_form_ajax($form, FormStateInterface $form_state) {
+  $gengo_job_id = $form_state->getTriggeringElement()["#gengo_job_id"];
+  $target_key = $form_state->getTriggeringElement()["#target_key"];
   $parts = explode('|', $target_key);
   $top_key = $parts[0];
   return $form['review'][$top_key][$target_key]['below'][$gengo_job_id . '_gengo']['comments_wrapper'];
@@ -51,9 +50,9 @@ function tmgmt_mygengo_review_comments_pane_form_ajax($form, &$form_state) {
  *
  * @see MyGengoTranslatorUi::reviewForm()
  */
-function tmgmt_mygengo_review_form_input_pane_ajax($form, &$form_state) {
-  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
-  $target_key = $form_state['triggering_element']['#target_key'];
+function tmgmt_mygengo_review_form_input_pane_ajax($form, FormStateInterface $form_state) {
+  $gengo_job_id = $form_state->getTriggeringElement()['#gengo_job_id'];
+  $target_key = $form_state->getTriggeringElement()["#target_key"];
   $parts = explode('|', $target_key);
   $top_key = $parts[0];
   return $form['review'][$top_key][$target_key]['below'][$gengo_job_id . '_gengo']['input_wrapper'];
@@ -67,10 +66,10 @@ function tmgmt_mygengo_review_form_input_pane_ajax($form, &$form_state) {
  *
  * @see MyGengoTranslatorUi::getCommentForm()
  */
-function tmgmt_mygengo_gengo_cancel_form_submit($form, &$form_state) {
-  $form_state['rebuild'] = TRUE;
-  $form_state['gengo_action'] = NULL;
-  $form_state['active_gengo_job_id'] = NULL;
+function tmgmt_mygengo_gengo_cancel_form_submit($form, FormStateInterface $form_state) {
+  $form_state->setRebuild();
+  $form_state->set('gengo_action', NULL);
+  $form_state->set('active_gengo_job_id', NULL);
 }
 
 /**
@@ -80,10 +79,10 @@ function tmgmt_mygengo_gengo_cancel_form_submit($form, &$form_state) {
  *
  * @see MyGengoTranslatorUi::reviewForm()
  */
-function tmgmt_mygengo_gengo_action_form_submit($form, &$form_state) {
-  $form_state['rebuild'] = TRUE;
-  $form_state['gengo_action'] = $form_state['triggering_element']['#gengo_action'];
-  $form_state['active_gengo_job_id'] = $form_state['triggering_element']['#gengo_job_id'];
+function tmgmt_mygengo_gengo_action_form_submit($form, FormStateInterface $form_state) {
+  $form_state->setRebuild();
+  $form_state->set('gengo_action', $form_state->getTriggeringElement()["#gengo_action"]);
+  $form_state->set('active_gengo_job_id', $form_state->getTriggeringElement()["#gengo_job_id"]);
 }
 
 /**
@@ -91,10 +90,10 @@ function tmgmt_mygengo_gengo_action_form_submit($form, &$form_state) {
  *
  * @see MyGengoTranslatorUi::getCommentForm()
  */
-function tmgmt_mygengo_add_comment_form_validate($form, &$form_state) {
-  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
+function tmgmt_mygengo_add_comment_form_validate($form, FormStateInterface $form_state) {
+  $gengo_job_id = $form_state->getTriggeringElement()['#gengo_job_id'];
 
-  if (empty($form_state['values'][$gengo_job_id . '_comment'])) {
+  if (!($form_state->getValues()[$gengo_job_id . '_comment'])) {
     form_set_error($gengo_job_id . '_comment', t('Comment body cannot be empty.'));
   }
 }
@@ -104,21 +103,21 @@ function tmgmt_mygengo_add_comment_form_validate($form, &$form_state) {
  *
  * @see MyGengoTranslatorUi::getCommentForm()
  */
-function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
-  $form_state['rebuild'] = TRUE;
-  $form_state['gengo_action'] = NULL;
-  $form_state['active_gengo_job_id'] = NULL;
-  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
+function tmgmt_mygengo_add_comment_form_submit($form, FormStateInterface $form_state) {
+  $form_state->setRebuild();
+  $form_state->set('gengo_action', NULL);
+  $form_state->set('active_gengo_job_id', NULL);
+  $gengo_job_id = $form_state->getTriggeringElement()["#gengo_job_id"];
   /* @var JobItem $item */
-  $item = $form_state['controller']->getEntity();;
+  $item = $form_state->getFormObject()->getEntity();
   $job = $item->getJob();
 
   try {
     $connector = new GengoConnector($job->getTranslator(), Drupal::httpClient());
-    $connector->postComment($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
-    $form_state['submitted_gengo_action'] = 'comment';
+    $connector->postComment($gengo_job_id, $form_state->getValues()[$gengo_job_id . '_comment']);
+    $form_state->set('submitted_gengo_action', 'comment');
   }
-  catch (TMGMTException $e) {
+  catch (\Exception $e) {
     watchdog_exception('tmgmt_mygengo', $e);
     drupal_set_message(t('Unable to add comment. Error: !error', array('!error' => $e->getMessage())), 'error');
   }
@@ -132,33 +131,33 @@ function tmgmt_mygengo_add_comment_form_submit($form, &$form_state) {
  *
  * @see MyGengoTranslatorUi::getCommentForm()
  */
-function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
-  $form_state['rebuild'] = TRUE;
-  $form_state['gengo_action'] = NULL;
-  $form_state['active_gengo_job_id'] = NULL;
-  $gengo_job_id = $form_state['triggering_element']['#gengo_job_id'];
-  /* @var \Drupal\tmgmt\Entity\JobItem $item */
-  $item = $form_state['controller']->getEntity();
+function tmgmt_mygengo_add_revision_form_submit($form, FormStateInterface $form_state) {
+  $form_state->setRebuild();
+  $form_state->set('gengo_action', NULL);
+  $form_state->set('active_gengo_job_id', NULL);
+  $gengo_job_id = $form_state->getTriggeringElement()["#gengo_job_id"];
+  /** @var \Drupal\tmgmt\JobItemInterface $item */
+  $item = $form_state->getFormObject()->getEntity();
   $job = $item->getJob();
 
   try {
     $connector = new GengoConnector($job->getTranslator(), Drupal::httpClient());
-    $connector->reviseJob($gengo_job_id, $form_state['values'][$gengo_job_id . '_comment']);
+    $connector->reviseJob($gengo_job_id, $form_state->getValues()[$gengo_job_id . '_comment']);
 
-    $data_item_key = $form_state['values'][$gengo_job_id . '_data_item_key'];
+    $data_item_key = $form_state->getValues()[$gengo_job_id . '_data_item_key'];
     $item->updateData($data_item_key, array('#status' => TMGMT_DATA_ITEM_STATE_PENDING));
 
     $items = array();
-    $items[$item->tjiid] = $item;
+    $items[$item->id()] = $item;
 
     // Check remote mapping for duplicates, update them as well.
-    $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($item->tjid, $item->tjiid, $data_item_key);
+    $remotes = RemoteMapping::loadByLocalData($item->getJobId(), $item->id(), $data_item_key);
     $remote = reset($remotes);
     if (!empty($remote->remote_data['duplicates'])) {
       foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
         list($tjiid, $data_item_key) = explode('][', $duplicate_key, 2);
         if (!isset($items[$tjiid])) {
-          $items[$tjiid] = tmgmt_job_item_load($tjiid);
+          $items[$tjiid] = JobItem::load($tjiid);
         }
         if ($items[$tjiid]) {
           $items[$tjiid]->updateData($data_item_key, array('#status' => TMGMT_DATA_ITEM_STATE_PENDING));
@@ -171,44 +170,12 @@ function tmgmt_mygengo_add_revision_form_submit($form, &$form_state) {
       $item->save();
     }
 
-    $form_state['submitted_gengo_action'] = 'revision';
+    $form_state->set('submitted_gengo_action', 'revision');
   }
-  catch (TMGMTException $e) {
+  catch (\Exception $e) {
     watchdog_exception('tmgmt_mygengo', $e);
     drupal_set_message(t('Unable to add revision. Error: !error', array('!error' => $e->getMessage())), 'error');
   }
-}
-
-/**
- * Theme function to display comments thread.
- *
- * @param array $variables
- *   - thread: Comments thread received from gengo service.
- *
- * @return string
- *   HTML output.
- */
-function theme_tmgmt_mygengo_comments_thread($variables) {
-  $thread = $variables['thread'];
-  $gengo_job_id = $variables['gengo_job_id'];
-  if (empty($thread) || !is_array($thread)) {
-    return '';
-  }
-
-  $comments = array();
-  $i = 0;
-
-  foreach ($thread as $comment) {
-    $zebra = ++$i % 2 == 0 ? 'even' : 'odd';
-
-    $attributes = new Attribute(array('class' => array('gengo-comment-body', $zebra)));
-
-    $comments[] = '<div class="gengo-comment-meta">' .
-        t('At %time by %author:', array('%time' => format_date($comment['ctime']), '%author' => $comment['author'])) .
-        '</div><div ' . $attributes . '>' . check_plain($comment['body']) . '</div>';
-  }
-
-  return theme('item_list', array('items' => $comments)) . '<div class="comments-list-closing" id="' . $gengo_job_id . '-comments-list-closing"></div>';
 }
 
 /**
@@ -217,37 +184,25 @@ function theme_tmgmt_mygengo_comments_thread($variables) {
 function tmgmt_mygengo_theme() {
   return array(
     'tmgmt_mygengo_comments_thread' => array(
-      'variables' => array('thread' => NULL, 'gegno_job_id' => NULL),
+      'file' => 'tmgmt_mygengo.theme.inc',
+      'variables' => array('thread' => NULL, 'gengo_job_id' => NULL),
+      'function' => 'theme_tmgmt_mygengo_comments_thread',
     ),
   );
 }
 
 /**
- * Implements hook_menu().
- */
-function tmgmt_mygengo_menu() {
-  $items['tmgmt_mygengo_callback'] = array(
-    'type' => MENU_CALLBACK,
-    'title' => 'mygengo_callback',
-    'description' => '',
-    'page callback' => 'tmgmt_mygengo_callback',
-    'access callback' => 'tmgmt_mygengo_access_check'
-  );
-  return $items;
-}
-
-/**
  * Submit callback to poll translations form Gengo.
  */
-function _tmgmt_mygengo_poll_submit($form, &$form_state) {
+function _tmgmt_mygengo_poll_submit($form, FormStateInterface $form_state) {
   /**
-   * @var Job $job
+   * @var \Drupal\tmgmt\JobItemInterface $job
    */
-  $job = $form_state['controller']->getEntity();
+  $job = $form_state->getFormObject()->getEntity();
   /**
    * @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $controller
    */
-  $controller = $job->getTranslator()->getController();
+  $controller = $job->getTranslator()->getPlugin();
 
   // Fetch everything for this job, this updates the mapping and saves
   // translations if there are any.
@@ -255,67 +210,9 @@ function _tmgmt_mygengo_poll_submit($form, &$form_state) {
 
   // Clear comments cache.
   // @todo: Improve cache id to clear cache for this job item only?
-  cache('tmgmt')->deleteTags(array('tmgmt_mygengo_comments_' => TRUE));
+  \Drupal::cache('data')->delete('tmgmt_mygengo_comments_' . $job->id());
 
   drupal_set_message(t('All available translations from Gengo have been polled.'));
-}
-
-/**
- * Process response from mygengo.
- */
-function tmgmt_mygengo_callback() {
-  // First, check if this is a comment notification.
-  if (isset($_POST['comment'])) {
-    $comment = Json::decode($_POST['comment']);
-    cache('tmgmt')->deleteTags(array('tmgmt_mygengo_comments_' . $comment['job_id'] => FALSE));
-    return '';
-  }
-
-  // Check if we have a job.
-  if (!isset($_POST['job'])) {
-    return MENU_NOT_FOUND;
-  }
-
-  $data = Json::decode($_POST['job']);
-  list($tjid, $tjiid, $data_item_key) = explode('][', $data['custom_data'], 3);
-  $job = tmgmt_job_load($tjid);
-  if (!$job) {
-    watchdog('tmgmt_mygengo', 'Failed to load translation job for @data', array('@data' => var_export($data, TRUE)), WATCHDOG_WARNING);
-    return;
-  }
-
-  $remotes = entity_get_controller('tmgmt_remote')->loadByLocalData($tjid, $tjiid, $data_item_key);
-  $remote = reset($remotes);
-  // Create a mapping for this job if we don't have one yet. Should not happen
-  // as we pre-create mappings with the order id..
-  if (!$remote) {
-    $item = tmgmt_job_item_load($tjiid);
-    $item->addRemoteMapping($data_item_key, NULL, array(
-      'remote_identifier_2' => $data['job_id'],
-      'word_count' => $data['unit_count'],
-      'remote_data' => array(
-        'credits' => $data['credits'],
-        'tier' => $data['tier'],
-      ),
-      // @todo: Add remote_url.
-    ));
-  }
-  elseif (empty($remote->remote_identifier_2)) {
-    $remote->remote_identifier_2 = $data['job_id'];
-    $remote->word_count = $data['unit_count'];
-    $remote->remote_data['credits'] = $data['credits'];
-    $remote->remote_data['tier'] = $data['tier'];
-    $remote->save();
-  }
-
-  /**
-   * @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $mygengo
-   */
-  $mygengo = $job->getTranslator()->getController();
-  // Prepend the job item id.
-  $mygengo->saveTranslation($job, $tjiid . '][' . $data_item_key, $data);
-
-  print '';
 }
 
 /**

@@ -1,17 +1,23 @@
 <?php
 /**
  * @file
- * Connector class for Gengo service.
+ * Contains \Drupal\tmgmt_mygengo\GengoConnector.
  */
 
 namespace Drupal\tmgmt_mygengo;
 
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
-use Drupal\Component\Utility\Url;
-use Guzzle\Http\ClientInterface;
-use Guzzle\Http\Exception\RequestException;
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\BadResponseException;
+use Drupal\Core\Url;
+use GuzzleHttp;
+use GuzzleHttp\Message;
 
+/**
+ * Class GengoConnector
+ * Implements methods for connecting and getting data from mygengo.
+ */
 class GengoConnector {
 
   /**
@@ -54,7 +60,7 @@ class GengoConnector {
   /**
    * Guzzle HTTP client.
    *
-   * @var \Guzzle\Http\ClientInterface
+   * @var \GuzzleHttp\ClientInterface
    */
   protected $client;
 
@@ -68,7 +74,7 @@ class GengoConnector {
     $this->useSandbox = $translator->getSetting('use_sandbox');
     $this->pubKey = $translator->getSetting('api_public_key');
     $this->privateKey = $translator->getSetting('api_private_key');
-    $this->debug = variable_get('tmgmt_mygengo_debug', FALSE);
+    $this->debug = \Drupal::config('tmgmt_mygengo.settings')->get('tmgmt_mygengo_debug');
     $this->client = $client;
   }
 
@@ -297,7 +303,7 @@ class GengoConnector {
 
     $timestamp = gmdate('U');
 
-    if (variable_get('tmgmt_mygengo_use_mock_service', FALSE)) {
+    if (\Drupal::config('tmgmt_mygengo.settings')->get('use_mock_service')) {
       $url = $GLOBALS['base_url'] . '/tmgmt_mygengo_mock' . '/' . self::API_VERSION . '/' . $path;
     }
     elseif ($this->useSandbox) {
@@ -314,8 +320,8 @@ class GengoConnector {
           'ts' => $timestamp,
         ), $data);
 
-        $url = url($url, array('query' => $query, 'absolute' => TRUE));
-        $request = $this->client->createRequest($method, $url, $headers);
+        $url = Url::fromUri($url)->setOptions(array('query' => $query, 'absolute' => TRUE))->toString();
+        $request = $this->client->createRequest($method, $url, ['headers' => $headers]);
       }
       else {
         $data = array(
@@ -325,29 +331,31 @@ class GengoConnector {
           'data' => json_encode($data),
         );
 
-        $url = url($url, array('absolute' => TRUE));
-        $request = $this->client->createRequest($method, $url, $headers, $data);
+        $url = Url::fromUri($url)->setOptions(array('absolute' => TRUE))->toString();
+        $request = $this->client->createRequest($method, $url, ['headers' => $headers, 'body' => $data]);
       }
 
-      if (variable_get('tmgmt_mygengo_use_mock_service', FALSE) && isset($_COOKIE['XDEBUG_SESSION'])) {
-        $request->addCookie('XDEBUG_SESSION', $_COOKIE['XDEBUG_SESSION']);
+      if (\Drupal::config('tmgmt_mygengo.settings')->get('use_mock_service') && isset($_COOKIE['XDEBUG_SESSION'])) {
+        // @todo Passing on the debug cookie results in exceptions.
+        //$request->addHeader('Cookie', 'XDEBUG_SESSION=' . $_COOKIE['XDEBUG_SESSION']);
       }
-      $response = $request->send();
+      $response = $this->client->send($request);
 
       if ($this->debug == TRUE) {
-        watchdog('tmgmt_mygengo', "Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
+        \Drupal::logger('tmgmt_mygengo')->info("Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
           '@url' => $url,
           '@method' => $method,
-          '@data' => var_export($response->getRequest(), TRUE),
+          '@data' => var_export($request, TRUE),
           '@response' => var_export($response, TRUE),
-        ), WATCHDOG_DEBUG);
+        ));
       }
     }
-    catch (RequestException $e) {
-      $status_codes = Response::$statusTexts;
-      throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
-        array('@error' => $status_codes[$response->getStatusCode()], '@url' => $url));
+    catch (BadResponseException $e) {
+        $error = $e->getResponse()->json();
+        throw new \Exception('Unable to connect to Gengo service due to following error: ' . $error['message']);
     }
+
+    // debug($response->getBody()->getContents());
 
     $results = $response->json();
 
