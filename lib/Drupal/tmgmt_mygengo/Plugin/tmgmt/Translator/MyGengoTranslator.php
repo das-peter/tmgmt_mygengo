@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator.
+ * Provides Gengo translation plugin controller.
  */
 
 namespace Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator;
@@ -10,16 +10,14 @@ namespace Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator;
 use Drupal;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\tmgmt\Entity\Job;
+use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
 use Drupal\tmgmt\TranslatorPluginBase;
+use Drupal\tmgmt\Annotation\TranslatorPlugin;
+use Drupal\Core\Annotation\Translation;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\tmgmt_mygengo\GengoConnector;
-use GuzzleHttp\ClientInterface;
-use Drupal\tmgmt\TranslatorInterface;
-use Drupal\tmgmt\JobInterface;
-use Drupal\Core\Url;
-use Drupal\tmgmt\Entity\JobItem;
-use Drupal\tmgmt\Entity\RemoteMapping;
+use Guzzle\Http\ClientInterface;
 
 /**
  * Gengo translation plugin controller.
@@ -37,16 +35,6 @@ use Drupal\tmgmt\Entity\RemoteMapping;
 class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactoryPluginInterface {
 
   /**
-   * {@inheritdoc}
-   */
-  protected $escapeStart = '[[[';
-
-  /**
-   * {@inheritdoc}
-   */
-  protected $escapeEnd = ']]]';
-
-  /**
    * If set it will be sent by job post action as a comment.
    *
    * @var string
@@ -56,14 +44,14 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * Guzzle HTTP client.
    *
-   * @var \GuzzleHttp\ClientInterface
+   * @var \Guzzle\Http\ClientInterface
    */
   protected $client;
 
   /**
    * Constructs a MyGengoTranslator object.
    *
-   * @param \GuzzleHttp\ClientInterface $client
+   * @param \Guzzle\Http\ClientInterface $client
    *   The Guzzle HTTP client.
    * @param array $configuration
    *   A configuration array containing information about the plugin instance.
@@ -80,9 +68,9 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, array $plugin_definition) {
     return new static(
-      $container->get('http_client'),
+      $container->get('http_default_client'),
       $configuration,
       $plugin_id,
       $plugin_definition
@@ -128,7 +116,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public function isAvailable(TranslatorInterface $translator) {
+  public function isAvailable(Translator $translator) {
     if ($translator->getSetting('api_public_key') && $translator->getSetting('api_private_key')) {
       return TRUE;
     }
@@ -140,13 +128,13 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    *
    * Here we will actually query source and get translations.
    */
-  public function requestTranslation(JobInterface $job) {
+  public function requestTranslation(Job $job) {
 
     try {
 
       // Check if we have comment from user input and if yes, set it to be sent.
-      if ($job->getSetting('comment')) {
-        $this->setServiceComment($job->getSetting('comment'));
+      if (!empty($job->settings['comment'])) {
+        $this->setServiceComment($job->settings['comment']);
       }
 
       $this->sendJob($job);
@@ -163,7 +151,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public function getSupportedRemoteLanguages(TranslatorInterface $translator) {
+  public function getSupportedRemoteLanguages(Translator $translator) {
     if (!empty($this->supportedRemoteLanguages)) {
       return $this->supportedRemoteLanguages;
     }
@@ -174,7 +162,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         $this->supportedRemoteLanguages[$gengo_language['lc']] = $gengo_language['lc'];
       }
     }
-    catch (\Exception $e) {
+    catch (TMGMTException $e) {
       watchdog_exception('tmgmt', $e);
       drupal_set_message($e->getMessage(), 'error');
     }
@@ -185,19 +173,13 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  public function getSupportedTargetLanguages(TranslatorInterface $translator, $source_language) {
+  public function getSupportedTargetLanguages(Translator $translator, $source_language) {
     $results = array();
 
-    try {
-      $connector = new GengoConnector($translator, $this->client);
-      $response = $connector->getLanguages($translator->mapToRemoteLanguage($source_language));
-      foreach ($response as $target) {
-        $results[$translator->mapToLocalLanguage($target['lc'])] = $translator->mapToLocalLanguage($target['lc']);
-      }
-    }
-    catch (\Exception $e) {
-      watchdog_exception('tmgmt', $e);
-      drupal_set_message($e->getMessage(), 'error');
+    $connector = new GengoConnector($translator, $this->client);
+    $response = $connector->getLanguages($translator->mapToRemoteLanguage($source_language));
+    foreach ($response as $target) {
+      $results[$translator->mapToLocalLanguage($target['lc'])] = $translator->mapToLocalLanguage($target['lc']);
     }
 
     return $results;
@@ -216,7 +198,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    *   - Status object with order info.
    */
   public function sendJob(Job $job, $quote_only = FALSE) {
-    $data = \Drupal::service('tmgmt.data')->filterTranslatable($job->getData());
+    $data = tmgmt_flatten_data($job->getData());
 
     $translator = $job->getTranslator();
     $translations = array();
@@ -240,22 +222,22 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // Keep track of source texts for easy lookup.
       $sources[$key] = $value['#text'];
 
-      $translations[$job->id() . '][' . $key] = array(
+      $translations[$job->tjid . '][' . $key] = array(
         'type' => 'text',
-        'slug' =>  \Drupal::service('tmgmt.data')->itemLabel($value, 56),
+        'slug' => tmgmt_data_item_label($value),
         'body_src' => $value['#text'],
-        'lc_src' => $translator->mapToRemoteLanguage($job->getSourceLangcode()),
-        'lc_tgt' => $translator->mapToRemoteLanguage($job->getTargetLangcode()),
-        'tier' => $job->getSetting('quality'),
-        'callback_url' => Url::fromRoute('tmgmt_mygengo.callback')->setOptions(array('absolute' => TRUE))->toString(),
-        'custom_data' => $job->id() . '][' . $key,
+        'lc_src' => $translator->mapToRemoteLanguage($job->source_language),
+        'lc_tgt' => $translator->mapToRemoteLanguage($job->target_language),
+        'tier' => $job->settings['quality'],
+        'callback_url' => url('tmgmt_mygengo_callback', array('absolute' => TRUE)),
+        'custom_data' => $job->tjid . '][' . $key,
         'position' => $position++,
         'auto_approve' => (int) $translator->getSetting('mygengo_auto_approve'),
         'use_preferred' => (int) $translator->getSetting('use_preferred'),
       );
 
       if (!empty($this->serviceComment)) {
-        $translations[$job->id() . '][' . $key]['comment'] = $this->serviceComment;
+        $translations[$job->tjid . '][' . $key]['comment'] = $this->serviceComment;
       }
     }
 
@@ -294,18 +276,17 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         $job->addMessage('Callback called for @key and status @status without translation.', array('@key' => $data['custom_data'], '@status' => $data['status']));
         return;
       }
-      $text = $this->unescapeText($data['body_tgt']);
-      $job->addTranslatedData(array('#text' => $text), $key);
+      $job->addTranslatedData(array('#text' => $data['body_tgt']), $key);
 
       // Look for duplicated strings that were saved with a mapping to this key.
       // @todo: Refactor this method to accept the remote instead of $key?
       list($tjiid, $data_item_key) = explode('][', $key, 2);
-      $remotes = RemoteMapping::loadByLocalData($job->id(), $tjiid, $data_item_key);
+      $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid, $tjiid, $data_item_key);
       $remote = reset($remotes);
-      if ($remote && !empty($remote->remote_data->duplicates)) {
+      if ($remote && !empty($remote->remote_data['duplicates'])) {
         // If we found any mappings, also add the translation for those.
-        foreach ($remote->remote_data->duplicates as $duplicate_key) {
-          $job->addTranslatedData(array('#text' => $text), $duplicate_key);
+        foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
+          $job->addTranslatedData(array('#text' => $data['body_tgt']), $duplicate_key);
         }
       }
     }
@@ -348,7 +329,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // @todo - this is just a quick fix so that we can finish job submission
       // in such case. But not a solution as we end up with not mapped jobs
       // at gengo. This should be fixed in #2022147.
-      if ($response_job[0]['status'] == 'held') {
+      if ($response_job['status'] == 'held') {
         continue;
       }
 
@@ -365,7 +346,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       list(, $tjiid, $data_item_key) = explode('][', $key, 3);
 
       $item_id_data_key = $tjiid . '][' . $data_item_key;
-      $item = JobItem::load($tjiid);
+      $item = tmgmt_job_item_load($tjiid);
       // Create the mapping.
       $item->addRemoteMapping($data_item_key, NULL, array(
         // Yes, this is not a joke, they really return string value "NULL" in
@@ -378,7 +359,6 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
           'duplicates' => isset($duplicates[$item_id_data_key]) ? $duplicates[$item_id_data_key] : array(),
         ),
       ));
-
       // Update the translation. This needs to be after the mapping as it
       // depends on it for the duplicates handling.
       $this->saveTranslation($job, $item_id_data_key, $response_job);
@@ -389,7 +369,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    * Creates placeholder records in the mapping table.
    *
    * The idea here is not to introduce additional storage to temporarily store
-   * gengo order id before we get gengo job ids.
+   * gegngo order id before we get gengo job ids.
    *
    * @param \Drupal\tmgmt\Entity\Job $job
    *   Job for which to initiate mappings with remote jobs.
@@ -422,7 +402,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
    */
   public function fetchGengoJobs(Job $job) {
     // Search for placeholder item.
-    $remotes = RemoteMapping::loadByLocalData($job->id());
+    $remotes = Drupal::entityManager()->getStorageController('tmgmt_remote')->loadByLocalData($job->tjid);
 
     $connector = new GengoConnector($job->getTranslator(), $this->client);
 
@@ -431,11 +411,11 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
     $job_ids = array();
     $new_job_ids = array();
     foreach ($remotes as $remote) {
-      if (!empty($remote->remote_identifier_1->value) && !isset($order_ids[$remote->remote_identifier_1->value])) {
-        $order_ids[$remote->remote_identifier_1->value] = $remote->remote_identifier_1->value;
+      if (!empty($remote->remote_identifier_1) && !isset($order_ids[$remote->remote_identifier_1])) {
+        $order_ids[$remote->remote_identifier_1] = $remote->remote_identifier_1;
       }
-      if (!empty($remote->remote_identifier_2->value)) {
-        $job_ids[$remote->remote_identifier_2->value] = $remote->remote_identifier_2->value;
+      if (!empty($remote->remote_identifier_2)) {
+        $job_ids[$remote->remote_identifier_2] = $remote->remote_identifier_2;
       }
     }
 
@@ -502,7 +482,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
 
         $matching_remote = NULL;
         foreach ($remotes as $remote) {
-          if ($remote->data_item_key->value == $data_item_key && $remote->tjiid == $tjiid) {
+          if ($remote->data_item_key == $data_item_key && $remote->tjiid == $tjiid) {
             $matching_remote = $remote;
             break;
           }
@@ -510,7 +490,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
 
         // We don't have a remote mapping yet, create one.
         if (!$matching_remote) {
-          $item = JobItem::load($tjiid);
+          $item = tmgmt_job_item_load($tjiid);
           $item->addRemoteMapping($data_item_key, $new_job_ids[$response_job['job_id']], array(
             'remote_identifier_2' => $response_job['job_id'],
             'word_count' => $response_job['unit_count'],
@@ -523,10 +503,12 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
         }
         // We have a mapping, update it.
         else {
-          $matching_remote->remote_identifier_2->value = $response_job['job_id'];
+          $matching_remote->remote_identifier_2 = $response_job['job_id'];
           $matching_remote->word_count = $response_job['unit_count'];
-          $matching_remote->addRemoteData('credits', $response_job['credits']);
-          $matching_remote->addRemoteData('tier', $response_job['tier']);
+          $matching_remote->remote_data = array(
+            'credits' => $response_job['credits'],
+            'tier' => $response_job['tier'],
+          );
           $matching_remote->save();
         }
       }

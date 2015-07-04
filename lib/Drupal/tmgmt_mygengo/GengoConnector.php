@@ -1,23 +1,17 @@
 <?php
 /**
  * @file
- * Contains \Drupal\tmgmt_mygengo\GengoConnector.
+ * Connector class for Gengo service.
  */
 
 namespace Drupal\tmgmt_mygengo;
 
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\BadResponseException;
-use Drupal\Core\Url;
-use GuzzleHttp;
-use GuzzleHttp\Message;
+use Drupal\Component\Utility\Url;
+use Guzzle\Http\ClientInterface;
+use Guzzle\Http\Exception\RequestException;
 
-/**
- * Class GengoConnector
- * Implements methods for connecting and getting data from mygengo.
- */
 class GengoConnector {
 
   /**
@@ -60,7 +54,7 @@ class GengoConnector {
   /**
    * Guzzle HTTP client.
    *
-   * @var \GuzzleHttp\ClientInterface
+   * @var \Guzzle\Http\ClientInterface
    */
   protected $client;
 
@@ -74,7 +68,7 @@ class GengoConnector {
     $this->useSandbox = $translator->getSetting('use_sandbox');
     $this->pubKey = $translator->getSetting('api_public_key');
     $this->privateKey = $translator->getSetting('api_private_key');
-    $this->debug = \Drupal::config('tmgmt_mygengo.settings')->get('tmgmt_mygengo_debug');
+    $this->debug = variable_get('tmgmt_mygengo_debug', FALSE);
     $this->client = $client;
   }
 
@@ -303,7 +297,7 @@ class GengoConnector {
 
     $timestamp = gmdate('U');
 
-    if (\Drupal::config('tmgmt_mygengo.settings')->get('use_mock_service')) {
+    if (variable_get('tmgmt_mygengo_use_mock_service', FALSE)) {
       $url = $GLOBALS['base_url'] . '/tmgmt_mygengo_mock' . '/' . self::API_VERSION . '/' . $path;
     }
     elseif ($this->useSandbox) {
@@ -320,8 +314,8 @@ class GengoConnector {
           'ts' => $timestamp,
         ), $data);
 
-        $url = Url::fromUri($url)->setOptions(array('query' => $query, 'absolute' => TRUE))->toString();
-        $request = $this->client->createRequest($method, $url, ['headers' => $headers]);
+        $url = url($url, array('query' => $query, 'absolute' => TRUE));
+        $request = $this->client->createRequest($method, $url, $headers);
       }
       else {
         $data = array(
@@ -331,31 +325,29 @@ class GengoConnector {
           'data' => json_encode($data),
         );
 
-        $url = Url::fromUri($url)->setOptions(array('absolute' => TRUE))->toString();
-        $request = $this->client->createRequest($method, $url, ['headers' => $headers, 'body' => $data]);
+        $url = url($url, array('absolute' => TRUE));
+        $request = $this->client->createRequest($method, $url, $headers, $data);
       }
 
-      if (\Drupal::config('tmgmt_mygengo.settings')->get('use_mock_service') && isset($_COOKIE['XDEBUG_SESSION'])) {
-        // @todo Passing on the debug cookie results in exceptions.
-        //$request->addHeader('Cookie', 'XDEBUG_SESSION=' . $_COOKIE['XDEBUG_SESSION']);
+      if (variable_get('tmgmt_mygengo_use_mock_service', FALSE) && isset($_COOKIE['XDEBUG_SESSION'])) {
+        $request->addCookie('XDEBUG_SESSION', $_COOKIE['XDEBUG_SESSION']);
       }
-      $response = $this->client->send($request);
+      $response = $request->send();
 
       if ($this->debug == TRUE) {
-        \Drupal::logger('tmgmt_mygengo')->info("Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
+        watchdog('tmgmt_mygengo', "Sending request to gengo at @url method @method with data @data\n\nResponse: @response", array(
           '@url' => $url,
           '@method' => $method,
-          '@data' => var_export($request, TRUE),
+          '@data' => var_export($response->getRequest(), TRUE),
           '@response' => var_export($response, TRUE),
-        ));
+        ), WATCHDOG_DEBUG);
       }
     }
-    catch (BadResponseException $e) {
-        $error = $e->getResponse()->json();
-        throw new \Exception('Unable to connect to Gengo service due to following error: ' . $error['message']);
+    catch (RequestException $e) {
+      $status_codes = Response::$statusTexts;
+      throw new TMGMTException('Unable to connect to Gengo service due to following error: @error at @url',
+        array('@error' => $status_codes[$response->getStatusCode()], '@url' => $url));
     }
-
-    // debug($response->getBody()->getContents());
 
     $results = $response->json();
 

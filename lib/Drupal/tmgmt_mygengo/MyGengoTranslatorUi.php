@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\tmgmt_mygengo\MyGengoTranslatorUi.
+ * Please supply a file description.
  */
 
 namespace Drupal\tmgmt_mygengo;
@@ -10,13 +10,9 @@ namespace Drupal\tmgmt_mygengo;
 use Drupal;
 use Drupal\tmgmt\TranslatorPluginUiBase;
 use Drupal\tmgmt\Entity\Job;
+use Drupal\tmgmt\Entity\JobItem;
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
-use Drupal\Core\Form\FormStateInterface;
-use Drupal\tmgmt\JobItemInterface;
-use Drupal\tmgmt\TranslatorInterface;
-use Drupal\tmgmt\JobInterface;
-use Drupal\tmgmt\RemoteMappingInterface;
 
 /**
  * @file
@@ -27,23 +23,23 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function reviewDataItemElement(array $form, FormStateInterface $form_state, $data_item_key, $parent_key, array $data_item, JobItemInterface $item) {
+  public function reviewDataItemElement($form, &$form_state, $data_item_key, $parent_key, array $data_item, JobItem $item) {
 
-    /** @var \Drupal\tmgmt\RemoteMappingInterface $mapping */
+    /** @var TMGMTRemote $mapping */
     $mapping = NULL;
     foreach ($item->getRemoteMappings() as $value) {
-      if ($value->data_item_key->value == $data_item_key) {
+      if ($value->data_item_key == $data_item_key) {
         $mapping = $value;
         break;
       }
     }
 
     // If no mapping found or mapping is not yet complete return.
-    if (empty($mapping) || !$mapping->getRemoteIdentifier2()) {
+    if (empty($mapping) || empty($mapping->remote_identifier_2)) {
       return $form;
     }
 
-    $gengo_job_id = $mapping->getRemoteIdentifier2();
+    $gengo_job_id = $mapping->remote_identifier_2;
     $target_key = str_replace('][', '|', $data_item_key);
 
     // For state pending we need to check also for type as empty value will
@@ -96,9 +92,9 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       '#tree' => FALSE,
     );
 
-    if ($form_state->get('active_gengo_job_id') == $gengo_job_id) {
+    if (!empty($form_state['active_gengo_job_id']) && $form_state['active_gengo_job_id'] == $gengo_job_id) {
       $form['below'][$gengo_job_id . '_gengo']['input_wrapper'] +=
-          $this->getCommentForm(tmgmt_review_form_element_ajaxid($parent_key), $gengo_job_id, $form_state->get('gengo_action'), $mapping);
+          $this->getCommentForm(tmgmt_ui_review_form_element_ajaxid($parent_key), $gengo_job_id, $form_state['gengo_action'], $mapping);
     }
     // Input pane end.
 
@@ -108,7 +104,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       '#suffix' => '</div>',
     );
 
-    $thread = $this->fetchComments($item->getTranslator(), $gengo_job_id, !($form_state->get('submitted_gengo_action')));
+    $thread = $this->fetchComments($item->getTranslator(), $gengo_job_id, !empty($form_state['submitted_gengo_action']));
 
     $form['below'][$gengo_job_id . '_gengo']['comments_wrapper']['comments'] = array(
       '#type' => 'markup',
@@ -117,24 +113,18 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
     );
 
     if (!empty($thread)) {
-      $form['below'][$gengo_job_id . '_gengo']['comments_wrapper']['comments'] = array(
-        '#theme' => 'tmgmt_mygengo_comments_thread',
-        '#thread' => $thread,
-        '#gengo_job_id' => $gengo_job_id,
-      );
-      /*['#theme'] = 'tmgmt_mygengo_comments_thread';
-      $form['below'][$gengo_job_id . '_gengo']['comments_wrapper']['comments']['#thread'] = $thread;
-      $form['below'][$gengo_job_id . '_gengo']['comments_wrapper']['comments']['#gengo_job_id'] = $gengo_job_id;*/
+      $form['below'][$gengo_job_id . '_gengo']['comments_wrapper']['comments']['#markup'] =
+          theme('tmgmt_mygengo_comments_thread', array('thread' => $thread, 'gengo_job_id' => $gengo_job_id));
     }
 
-    if (!($form_state->get('submitted_gengo_action'))) {
+    if (!empty($form_state['submitted_gengo_action'])) {
       $form['below'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_comment_gengo_id'] = array(
         '#type' => 'hidden',
         '#value' => $gengo_job_id,
       );
       $form['below'][$gengo_job_id . '_gengo']['comments_wrapper']['submitted_gengo_action'] = array(
         '#type' => 'hidden',
-        '#value' => $form_state->get('submitted_gengo_action'),
+        '#value' => $form_state['submitted_gengo_action'],
       );
     }
     // Comments pane end.
@@ -144,9 +134,10 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function reviewForm(array $form, FormStateInterface $form_state, JobItemInterface $item) {
+  public function reviewForm($form, &$form_state, JobItem $item) {
 
-    $form['#attached']['library'][] = 'tmgmt_mygengo/comments';
+    $form['#attached']['js'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/js/tmgmt_mygengo_comments.js';
+    $form['#attached']['css'][] = drupal_get_path('module', 'tmgmt_mygengo') . '/css/tmgmt_mygengo_comments.css';
 
     return $form;
   }
@@ -168,7 +159,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
    */
   protected function getCommentForm($ajax_id, $gengo_job_id, $action, $mapping) {
 
-    $target_key = str_replace('][', '|', $mapping->data_item_key->value);
+    $target_key = str_replace('][', '|', $mapping->data_item_key);
 
     $submit_base = array(
       '#type' => 'submit',
@@ -176,7 +167,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       '#gengo_job_id' => $gengo_job_id,
       '#target_key' => $target_key,
       '#ajax' => array(
-        'callback' => '::ajaxReviewForm',
+        'callback' => 'tmgmt_ui_translation_review_form_ajax',
         'wrapper' => $ajax_id,
       ),
     );
@@ -189,7 +180,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       );
       $form[$gengo_job_id . '_data_item_key'] = array(
         '#type' => 'value',
-        '#value' => $mapping->data_item_key->value,
+        '#value' => $mapping->data_item_key,
       );
 
       $form[$gengo_job_id . '_submit_revision'] = $submit_base + array(
@@ -233,7 +224,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function pluginSettingsForm(array $form, FormStateInterface $form_state, TranslatorInterface $translator, $busy = FALSE) {
+  public function pluginSettingsForm($form, &$form_state, Translator $translator, $busy = FALSE) {
 
     $form['api_public_key'] = array(
       '#type' => 'textfield',
@@ -282,39 +273,33 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function checkoutSettingsForm(array $form, FormStateInterface $form_state, JobInterface $job) {
+  public function checkoutSettingsForm($form, &$form_state, Job $job) {
     $translator = $job->getTranslator();
 
     // Set the quality setting from submitted vals - we need this for quote as
     // repetitive change of Quality select will not update the job settings.
-    if ($form_state->getValue(['settings','quality'])) {
-      $quality = array(
-        'quality' => $form_state->getValue(['settings','quality']),
-      );
-      $job->settings = $quality;
+    if (isset($form_state['values']['settings']['quality'])) {
+      $job->settings['quality'] = $form_state['values']['settings']['quality'];
     }
 
     // In case quality has not been set yet, init it to default.
-    if (!($job->getSetting('quality'))) {
-      $standard = array(
-        'quality' => 'standard',
-      );
-      $job->settings = $standard;
+    if (empty($job->settings['quality'])) {
+      $job->settings['quality'] = 'standard';
     }
 
     $settings['quality'] = array(
       '#type' => 'select',
       '#title' => t('Quality'),
       '#options' => $this->getAvailableTiersOptions($job),
-      '#default_value' => $job->getSetting('quality'),
+      '#default_value' => $job->settings['quality'],
       '#description' => t('Choose the level of quality for this translation job.'),
       '#ajax' => array(
-        'callback' => '::ajaxTranslatorSelect',
+        'callback' => 'tmgmt_ui_ajax_callback_translator_select',
         'wrapper' => 'tmgmt-ui-translator-settings',
       ),
     );
 
-    if ($job->getSetting('quality') == 'machine') {
+    if ($job->settings['quality'] == 'machine') {
       return $settings;
     }
 
@@ -353,7 +338,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       '#type' => 'textarea',
       '#title' => t('Instructions'),
       '#description' => t('You can provide a set of instructions so that the translator will better understand your requirements.'),
-      '#default_value' => !($job->getSetting('comment')) ? $job->getSetting('comment') : NULL,
+      '#default_value' => !empty($job->settings['comment']) ? $job->settings['comment'] : NULL,
     );
 
     return $settings;
@@ -362,7 +347,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   /**
    * {@inheritdoc}
    */
-  public function checkoutInfo(JobInterface $job) {
+  public function checkoutInfo(Job $job) {
     $form = array();
 
     if ($job->isActive()) {
@@ -389,10 +374,10 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
    * @throws \Drupal\tmgmt\TMGMTException
    *   In case of error doing request to gengo service.
    */
-  protected function getQuoteInfo(JobInterface $job) {
+  protected function getQuoteInfo(Job $job) {
     $response = NULL;
     /* @var \Drupal\tmgmt_mygengo\Plugin\tmgmt\Translator\MyGengoTranslator $plugin */
-    $plugin = $job->getTranslator()->getPlugin();
+    $plugin = $job->getTranslatorController();
 
     try {
       $response = $plugin->sendJob($job, TRUE);
@@ -411,18 +396,18 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       'sum_word_count' => 0,
     );
 
-    if (!empty($response['jobs'])) {
-      $jobs = (array) $response['jobs'];
+    if (!empty($response->jobs)) {
+      $jobs = (array) $response->jobs;
 
-      $quote['currency'] = reset($jobs)['currency'];
+      $quote['currency'] = reset($jobs)->currency;
 
       // Sum up quotes from each job.
-      foreach ($response['jobs'] as $job) {
-        $quote['sum_word_count'] += $job['unit_count'];
-        $quote['sum_credits'] += $job['credits'];
+      foreach ($response->jobs as $job) {
+        $quote['sum_word_count'] += $job->unit_count;
+        $quote['sum_credits'] += $job->credits;
 
-        if ($job['eta'] > $quote['highest_eta']) {
-          $quote['highest_eta'] = $job['eta'];
+        if ($job->eta > $quote['highest_eta']) {
+          $quote['highest_eta'] = $job->eta;
         }
       }
     }
@@ -467,7 +452,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
    * @return array
    *   Associative array of tiers with info.
    */
-  protected function getAvailableTiersOptions(JobInterface $job) {
+  protected function getAvailableTiersOptions(Job $job) {
 
     $translator = $job->getTranslator();
 
@@ -496,7 +481,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
 
     foreach ($gengo_language_pairs as $tier) {
       // Skip if for other language pairs.
-      if ($tier['lc_src'] != $translator->mapToRemoteLanguage($job->getSourceLangcode()) || $tier['lc_tgt'] != $translator->mapToRemoteLanguage($job->getTargetLangcode())) {
+      if ($tier['lc_src'] != $translator->mapToRemoteLanguage($job->source_language) || $tier['lc_tgt'] != $translator->mapToRemoteLanguage($job->target_language)) {
         continue;
       }
 
@@ -533,7 +518,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
   public function fetchComments(Translator $translator, $gengo_job_id, $reload = FALSE) {
 
     $cid = 'tmgmt_mygengo_comments_' . $gengo_job_id;
-    $cache =  \Drupal::cache('data')->get($cid);
+    $cache = cache('tmgmt')->get($cid);
 
     if (isset($cache->data) && !$reload && $cache->expire > REQUEST_TIME) {
       return $cache->data;
@@ -546,7 +531,7 @@ class MyGengoTranslatorUi extends TranslatorPluginUiBase {
       $response = $connector->getComments($gengo_job_id);
 
       $data = isset($response['thread']) ? $response['thread'] : NULL;
-      \Drupal::cache('data')->set($cid, $data, REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
+      cache('tmgmt')->set($cid, $data, REQUEST_TIME + TMGMT_MYGENGO_COMMENTS_CACHE_EXPIRE);
       return $data;
     }
     catch (TMGMTException $e) {
