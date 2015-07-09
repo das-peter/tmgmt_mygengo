@@ -153,8 +153,8 @@ function tmgmt_mygengo_add_revision_form_submit($form, FormStateInterface $form_
     // Check remote mapping for duplicates, update them as well.
     $remotes = RemoteMapping::loadByLocalData($item->getJobId(), $item->id(), $data_item_key);
     $remote = reset($remotes);
-    if (!empty($remote->remote_data['duplicates'])) {
-      foreach ($remote->remote_data['duplicates'] as $duplicate_key) {
+    if (!empty($remote->remote_data->duplicates)) {
+      foreach ($remote->remote_data->duplicates as $duplicate_key) {
         list($tjiid, $data_item_key) = explode('][', $duplicate_key, 2);
         if (!isset($items[$tjiid])) {
           $items[$tjiid] = JobItem::load($tjiid);

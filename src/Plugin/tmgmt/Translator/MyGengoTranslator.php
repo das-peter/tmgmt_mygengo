@@ -348,7 +348,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // @todo - this is just a quick fix so that we can finish job submission
       // in such case. But not a solution as we end up with not mapped jobs
       // at gengo. This should be fixed in #2022147.
-      if ($response_job[0]['status'] == 'held') {
+      if ($response_job['status'] == 'held') {
         continue;
       }
 

@@ -43,7 +43,7 @@ class MyGengoTest extends TMGMTTestBase {
   /**
    * Tests basic API methods of the plugin.
    */
-  public function testAPI() {
+  public function dtestAPI() {
 
     $job = $this->createJob();
     $standard = array(
@@ -213,7 +213,7 @@ class MyGengoTest extends TMGMTTestBase {
     }
   }
 
-  public function testOrderModeCallback() {
+  public function dtestOrderModeCallback() {
     \Drupal::state()->set('tmgmt_mygengo_test_order_mode', 1);
 
     $this->translator->setSetting('api_public_key', 'correct key');
@@ -251,7 +251,6 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertTrue($job->isActive());
     $this->refreshVariables();
     $orders = \Drupal::state()->get('tmgmt_mygengo_test_orders', array());
-    debug($orders);
     $order_id = key($orders);
     $remotes = RemoteMapping::loadByLocalData($job->id());
     // Remotes should have been created with the order id and without job id.
@@ -281,17 +280,11 @@ class MyGengoTest extends TMGMTTestBase {
     ));
     */
 
-    debug($orders[$order_id]);
-
     $gengo_job = $orders[$order_id][$job->id() . '][' . $item->id() . '][wrapper][subwrapper1'];
-    debug($gengo_job);
     $post['job'] = Json::encode($gengo_job);
-
-    debug($post);
 
     $action = Url::fromRoute('tmgmt_mygengo.callback')->setOptions(array('absolute' => TRUE))->toString();
     $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
-    debug($out);
 
     // Response should be empty if everything went ok.
     $this->assertResponse(200);
@@ -364,6 +357,7 @@ class MyGengoTest extends TMGMTTestBase {
 
     // Check the updated mappings of item 1.
     $remotes = RemoteMapping::loadByLocalData($job->id(), $item->id());
+    debug($remotes);
     $this->assertEqual(count($remotes), 2, '2 remotes for item 1');
 
     $gengo_job = $orders[$order_id][$job->id() . '][' . $item->id() . '][body'];
@@ -392,7 +386,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual($remote->getRemoteData('tier'), $gengo_job['tier']);
   }
 
-  public function testAvailableStatus() {
+  public function dtestAvailableStatus() {
     $this->loginAsAdmin();
 
     // Make sure we have correct keys.
@@ -462,7 +456,7 @@ class MyGengoTest extends TMGMTTestBase {
   /**
    * Tests that duplicated strings can be translated correctly.
    */
-  public function testDuplicateStrings() {
+  public function dtestDuplicateStrings() {
     $this->loginAsAdmin();
 
     // Make sure we have correct keys.
@@ -531,7 +525,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual('mt_de_Not duplicate but same key', $data['wrapper']['duplicate1']['#translation']['#text']);
   }
 
-  public function testComments() {
+  public function dtestComments() {
     $this->loginAsAdmin();
 
     // Create job with two job items.
@@ -619,7 +613,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertText($comment);
   }
 
-  public function testPollJob() {
+  public function dtestPollJob() {
     $this->loginAsAdmin();
     $this->translator->setSetting('api_public_key', 'correct key');
     $this->translator->setSetting('api_private_key', 'correct key');
@@ -672,7 +666,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual($item_data['body']['#status'], TMGMT_DATA_ITEM_STATE_PENDING);
   }
 
-  public function testGengoCheckoutForm() {
+  public function dtestGengoCheckoutForm() {
     $this->loginAsAdmin();
     $this->translator->setSetting('api_public_key', 'correct key');
     $this->translator->setSetting('api_private_key', 'correct key');

@@ -64,8 +64,8 @@ class MyGengoController extends ControllerBase {
     elseif (empty($remote->remote_identifier_2->value)) {
       $remote->remote_identifier_2->value = $data['job_id'];
       $remote->word_count = $data['unit_count'];
-      $remote->remote_data['credits'] = $data['credits'];
-      $remote->remote_data['tier'] = $data['tier'];
+      $remote->addRemoteData('credits', $data['credits']);
+      $remote->addRemoteData('tier',  $data['tier']);
       $remote->save();
     }
 
