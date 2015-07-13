@@ -20,8 +20,9 @@ class GengoTranslatorTestController {
    * Mock service - Job PUT - used for job review.
    *
    * @param int $job_id
-   * @param Request $request
    *   Gengo job id.
+   * @param Request $request
+   *   The request object.
    */
   public function serviceJob($job_id, Request $request) {
     $data = array();
@@ -58,8 +59,10 @@ class GengoTranslatorTestController {
   }
 
   /**
-   * @param int $order_id
    * Mock service to return information about an order.
+   *
+   * @param int $order_id
+   *   Order ID.
    */
   public function serviceOrderGet($order_id) {
     $orders = \Drupal::state()->get('tmgmt_mygengo_test_orders', array());
@@ -88,8 +91,9 @@ class GengoTranslatorTestController {
    * Mock service call to create a comment.
    *
    * @param int $job_id
-   * @param Request $request
    *   Remote job id.
+   * @param Request $request
+   *   The request object.
    */
   public function serviceCommentCreate($job_id, Request $request) {
     $comment = new \stdClass();
@@ -131,8 +135,10 @@ class GengoTranslatorTestController {
 
 
   /**
-   * @param Request $request
    * Gengo mock service.
+   *
+   * @param Request $request
+   *   The request object.
    */
   public function serviceTranslate(Request $request) {
 
