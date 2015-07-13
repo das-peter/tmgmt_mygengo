@@ -22,9 +22,10 @@ class GengoTranslatorTestController {
    * @param int $job_id
    *   Gengo job id.
    */
-  public function serviceJob($job_id) {
+  public function serviceJob($job_id, Request $request) {
     $data = array();
-    parse_str(file_get_contents('php://input'), $data);
+    $putdata = $request->getContent();
+    parse_str($putdata, $data);
 
     $data = Json::decode($data['data']);
 
@@ -60,9 +61,7 @@ class GengoTranslatorTestController {
    * Mock service to return information about an order.
    */
   public function serviceOrderGet($order_id) {
-    debug($order_id);
     $orders = \Drupal::state()->get('tmgmt_mygengo_test_orders', array());
-    debug($orders[$order_id]);
     if (isset($orders[$order_id])) {
       $order = (object) array(
         'order_id' => $order_id,
@@ -133,8 +132,6 @@ class GengoTranslatorTestController {
    * Gengo mock service.
    */
   public function serviceTranslate(Request $request) {
-
-    //file_put_contents('debugging', print_r($request->request->get('data')));
 
     if ($error_response = tmgmt_mygengo_test_authenticate($request)) {
       return $error_response;

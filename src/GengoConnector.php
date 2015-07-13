@@ -6,6 +6,7 @@
 
 namespace Drupal\tmgmt_mygengo;
 
+use Drupal\crm_core_default_matching_engine\Plugin\crm_core_match\field\String;
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
 use GuzzleHttp\ClientInterface;
@@ -277,6 +278,7 @@ class GengoConnector {
    *   Gengo response data.
    */
   public function put($path, $data = array()) {
+
     return $this->request($path, 'PUT', $data);
   }
 
@@ -313,7 +315,7 @@ class GengoConnector {
       $url = self::PRODUCTION_URL . '/' . self::API_VERSION . '/' . $path;
     }
     try {
-      if ($method == 'GET' || $method == 'DELETE') {
+      if ($method == 'GET' || $method == 'DELETE' ) {
         $query = array_merge(array(
           'api_key' => $this->pubKey,
           'api_sig' => hash_hmac('sha1', $timestamp, $this->privateKey),
@@ -354,8 +356,6 @@ class GengoConnector {
         $error = $e->getResponse()->json();
         throw new \Exception('Unable to connect to Gengo service due to following error: ' . $error['message']);
     }
-
-    // debug($response->getBody()->getContents());
 
     $results = $response->json();
 

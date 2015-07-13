@@ -338,7 +338,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
       // For machine translations the job is not wrapped in another object
       // however for human translations it is. So try to cope with this
       // gengo system variety.
-      if (!empty($response_job['custom_data'])) {
+      if (!empty($response_job['custom_data']) || !empty($response_job[0]['custom_data'])) {
         $response_job = reset($response_job);
       }
 
@@ -502,7 +502,7 @@ class MyGengoTranslator extends TranslatorPluginBase implements ContainerFactory
 
         $matching_remote = NULL;
         foreach ($remotes as $remote) {
-          if ($remote->data_item_key->value == $data_item_key && $remote->tjiid == $tjiid) {
+          if ($remote->data_item_key->value == $data_item_key && $remote->getJobItem()->id() == $tjiid) {
             $matching_remote = $remote;
             break;
           }
