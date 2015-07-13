@@ -20,12 +20,12 @@ class GengoTranslatorTestController {
    * Mock service - Job PUT - used for job review.
    *
    * @param int $job_id
+   * @param Request $request
    *   Gengo job id.
    */
   public function serviceJob($job_id, Request $request) {
     $data = array();
-    $putdata = $request->getContent();
-    parse_str($putdata, $data);
+    parse_str($request->getContent(), $data);
 
     $data = Json::decode($data['data']);
 
@@ -58,6 +58,7 @@ class GengoTranslatorTestController {
   }
 
   /**
+   * @param int $order_id
    * Mock service to return information about an order.
    */
   public function serviceOrderGet($order_id) {
@@ -87,6 +88,7 @@ class GengoTranslatorTestController {
    * Mock service call to create a comment.
    *
    * @param int $job_id
+   * @param Request $request
    *   Remote job id.
    */
   public function serviceCommentCreate($job_id, Request $request) {
@@ -129,6 +131,7 @@ class GengoTranslatorTestController {
 
 
   /**
+   * @param Request $request
    * Gengo mock service.
    */
   public function serviceTranslate(Request $request) {

@@ -314,7 +314,7 @@ class GengoConnector {
       $url = self::PRODUCTION_URL . '/' . self::API_VERSION . '/' . $path;
     }
     try {
-      if ($method == 'GET' || $method == 'DELETE' ) {
+      if ($method == 'GET' || $method == 'DELETE') {
         $query = array_merge(array(
           'api_key' => $this->pubKey,
           'api_sig' => hash_hmac('sha1', $timestamp, $this->privateKey),
