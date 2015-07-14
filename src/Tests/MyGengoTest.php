@@ -251,7 +251,6 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertTrue($job->isActive());
     $this->refreshVariables();
     $orders = \Drupal::state()->get('tmgmt_mygengo_test_orders', array());
-    debug($orders);
     $order_id = key($orders);
     $remotes = RemoteMapping::loadByLocalData($job->id());
     // Remotes should have been created with the order id and without job id.
@@ -281,17 +280,11 @@ class MyGengoTest extends TMGMTTestBase {
     ));
     */
 
-    debug($orders[$order_id]);
-
     $gengo_job = $orders[$order_id][$job->id() . '][' . $item->id() . '][wrapper][subwrapper1'];
-    debug($gengo_job);
     $post['job'] = Json::encode($gengo_job);
-
-    debug($post);
 
     $action = Url::fromRoute('tmgmt_mygengo.callback')->setOptions(array('absolute' => TRUE))->toString();
     $out = $this->curlExec(array(CURLOPT_URL => $action, CURLOPT_POST => TRUE, CURLOPT_POSTFIELDS => $post));
-    debug($out);
 
     // Response should be empty if everything went ok.
     $this->assertResponse(200);
@@ -350,7 +343,6 @@ class MyGengoTest extends TMGMTTestBase {
     $item2->save();
 
     $job->requestTranslation();
-    $this->refreshVariables();
 
     // Add the jobs as a response.
     $this->refreshVariables();
@@ -375,7 +367,7 @@ class MyGengoTest extends TMGMTTestBase {
     $this->assertEqual($remote->getRemoteIdentifier2(), $gengo_job['job_id']);
     $this->assertEqual($remote->word_count->value, $gengo_job['unit_count']);
     $this->assertEqual($remote->getRemoteData('credits'), $gengo_job['credits']);
-    $this->assertEqual($remote->getRemoteData('credits'), $gengo_job['tier']);
+    $this->assertEqual($remote->getRemoteData('tier'), $gengo_job['tier']);
 
     // And item 2.
     $remotes = RemoteMapping::loadByLocalData($job->id(), $item2->id());
@@ -520,7 +512,6 @@ class MyGengoTest extends TMGMTTestBase {
     // Item 1.
     $this->assertTrue($item1->isNeedsReview());
     $data = $item1->getData();
-    debug($data);
     $this->assertEqual('mt_de_This text is a duplicate', $data['wrapper']['duplicate1']['#translation']['#text']);
     $this->assertEqual('mt_de_This text is a duplicate', $data['wrapper']['duplicate2']['#translation']['#text']);
 
@@ -601,13 +592,10 @@ class MyGengoTest extends TMGMTTestBase {
 
     // Request a review.
     $comment = $this->randomMachineName();
-    debug($comment);
     $this->drupalPostAjaxForm('admin/tmgmt/items/' . $item->id(), array(), array($remote->getRemoteIdentifier2() . '_revision_form' => '✍'));
-    debug($remote->getRemoteIdentifier2());
     $edit = array(
       $remote->getRemoteIdentifier2() . '_comment' => $comment,
     );
-    debug($edit);
     $this->drupalPostAjaxForm(NULL, $edit, array($remote->getRemoteIdentifier2() . '_submit' => t('Request revision')));
 
     $job = Job::load(($job->id()));

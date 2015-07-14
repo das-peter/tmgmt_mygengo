@@ -6,6 +6,7 @@
 
 namespace Drupal\tmgmt_mygengo;
 
+use Drupal\crm_core_default_matching_engine\Plugin\crm_core_match\field\String;
 use Drupal\tmgmt\Entity\Translator;
 use Drupal\tmgmt\TMGMTException;
 use GuzzleHttp\ClientInterface;
@@ -354,8 +355,6 @@ class GengoConnector {
         $error = $e->getResponse()->json();
         throw new \Exception('Unable to connect to Gengo service due to following error: ' . $error['message']);
     }
-
-    // debug($response->getBody()->getContents());
 
     $results = $response->json();
 
